@@ -1,5 +1,6 @@
 server:
   port: YourPort
+  public_base_url: "http://localhost:YourPort"
 
 database:
   enabled: true
@@ -8,7 +9,7 @@ database:
   username: YourUsername
   password: YourPassword
   name: laf_db 
-/* 统一使用该数据库名称 */
+#统一使用该数据库名称
 
 jwt:
   secret: YourSecret

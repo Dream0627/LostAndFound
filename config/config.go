@@ -2,12 +2,14 @@ package config
 
 import (
 	"fmt"
+
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
 )
 
 type ServerConfig struct {
-	Port int `mapstructure:"port"`
+	Port          int    `mapstructure:"port"`
+	PublicBaseURL string `mapstructure:"public_base_url"`
 }
 
 type DatabaseConfig struct {
@@ -20,15 +22,15 @@ type DatabaseConfig struct {
 }
 
 type Config struct {
-	Server   ServerConfig `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
-	JWTConfig JWTConfig `mapstructure:"jwt"`
+	Server    ServerConfig   `mapstructure:"server"`
+	Database  DatabaseConfig `mapstructure:"database"`
+	JWTConfig JWTConfig      `mapstructure:"jwt"`
 }
 
 type JWTConfig struct {
-    Secret string `mapstructure:"secret"`
-	ExpireSeconds int64 `mapstructure:"expires"`
-	Issuer string `mapstructure:"issuer"`
+	Secret        string `mapstructure:"secret"`
+	ExpireSeconds int64  `mapstructure:"expires"`
+	Issuer        string `mapstructure:"issuer"`
 }
 
 func Load() (*Config, error) {
@@ -49,9 +51,9 @@ func Load() (*Config, error) {
 		fmt.Println("配置已改变", e.Name)
 		if err := viper.Unmarshal(&cfg); err != nil {
 			fmt.Println("重新加载配置失败", err)
-			return 
+			return
 		}
-		fmt.Println("重新加载配置成功",e.Name)
+		fmt.Println("重新加载配置成功", e.Name)
 	})
 
 	return &cfg, nil
