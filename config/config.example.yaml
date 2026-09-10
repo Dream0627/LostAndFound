@@ -1,0 +1,16 @@
+server:
+  port: YourPort
+
+database:
+  enabled: true
+  host: YourHost
+  port: YourPort
+  username: YourUsername
+  password: YourPassword
+  name: laf_db 
+/* 统一使用该数据库名称 */
+
+jwt:
+  secret: YourSecret
+  issuer: YourIssuer
+  expires: YourExpires
