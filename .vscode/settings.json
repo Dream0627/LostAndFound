@@ -1,0 +1,7 @@
+{
+    "go.alternateTools": {
+        "go": "c:\\users\\administrator\\appdata\\local\\mise\\shims\\go",
+        "dlv": "c:\\users\\administrator\\appdata\\local\\mise\\shims\\dlv.exe",
+        "gopls": "c:\\users\\administrator\\appdata\\local\\mise\\shims\\gopls.exe"
+    }
+}
