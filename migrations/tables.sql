@@ -17,7 +17,8 @@ CREATE TABLE users (
 CREATE TABLE posts (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '帖子ID',
     user_id BIGINT UNSIGNED NOT NULL COMMENT '作者ID',
-    type VARCHAR(10) NOT NULL COMMENT '帖子类型: lost-丢失寻物, find-寻找失主',
+    type VARCHAR(10) NOT NULL COMMENT '帖子类型: lost-丢失寻物, found-寻找失主',
+    title VARCHAR(100) NOT NULL,
     content VARCHAR(2000) NOT NULL,
     image_url VARCHAR(1024) DEFAULT NULL COMMENT '帖子图片的相对路径或URL',
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),

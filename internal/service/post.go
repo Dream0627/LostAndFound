@@ -21,12 +21,13 @@ func NewPostService(db *repository.PostRepository) *PostService {
 
 type CreateInput struct {
     Type     string
+    Title    string
     Content  string
     ImageURL *string
 }
 
 func (s *PostService) Create(input CreateInput, userID uint) (*model.Post, error) {
-    if input.Type != "lost" && input.Type != "find" {
+    if input.Type != "lost" && input.Type != "found" {
         return nil, apperror.ParamError
     }
     input.Content = strings.TrimSpace(input.Content)
@@ -36,6 +37,7 @@ func (s *PostService) Create(input CreateInput, userID uint) (*model.Post, error
 
     post := &model.Post{
         Type:     input.Type,
+        Title:    input.Title,
         ImageURL: input.ImageURL,
         Content:  input.Content,
         UserID:   userID,
