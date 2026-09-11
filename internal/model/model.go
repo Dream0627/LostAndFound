@@ -19,6 +19,7 @@ type Post struct {
 	Title     string    `gorm:"column:title;type:varchar(2000);not null" json:"title"`
     ImageURL  *string   `gorm:"column:image_url;type:varchar(1024);default:null;comment:图片URL" json:"image_url"`       
     Content   string    `gorm:"column:content;type:varchar(2000);not null" json:"content"`
+	IsFinished bool     `gorm:"column:is_finished;type:bool;default:false" json:"is_finished"`
     CreatedAt time.Time `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);index" json:"created_at"`
     UpdatedAt time.Time `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);index" json:"updated_at"`
 }

@@ -65,9 +65,9 @@ func (s *UserService) Register(input RegisterInput) (*model.User, error) {
 	if !numericUsername.MatchString(input.Username) {
 		return nil, apperror.ParamError
 	}
-	if input.Role != "student" {
-		return nil, apperror.ParamError
-	}
+	// if input.Role != "student" {
+	// 	return nil, apperror.ParamError
+	// }
 
 	if _, err := s.repository.FindByUsername(input.Username); err == nil {
 		return nil, apperror.RepeatError

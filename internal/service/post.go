@@ -40,6 +40,7 @@ func (s *PostService) Create(input CreateInput, userID uint) (*model.Post, error
         Title:    input.Title,
         ImageURL: input.ImageURL,
         Content:  input.Content,
+        IsFinished: false,
         UserID:   userID,
     }
 

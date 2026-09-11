@@ -23,6 +23,7 @@ CREATE TABLE posts (
     title VARCHAR(100) NOT NULL,
     content VARCHAR(2000) NOT NULL,
     image_url VARCHAR(1024) DEFAULT NULL COMMENT '帖子图片的相对路径或URL',
+    is_finished BOOLEAN DEFAULT FALSE COMMENT '帖子是否完成',
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     KEY idx_posts_user_id (user_id),
