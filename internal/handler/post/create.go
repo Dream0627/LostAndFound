@@ -34,16 +34,18 @@ func buildPublicImageURL(publicBaseURL, relativePath string) string {
 func Create(postService *service.PostService, publicBaseURL string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		postType := c.PostForm("type")
+		title := c.PostForm("title")
 		content := c.PostForm("content")
+		
 
-		if postType == "" || content == "" {
+		if postType == "" || content == "" || title == "" {
 			apperror.AbortWithException(c, apperror.ParamError, nil)
 			return
 		}
 
 		file, header, err := c.Request.FormFile("image")
 		if err != nil && err != http.ErrMissingFile {
-			apperror.AbortWithException(c, apperror.ParamError, nil)
+			apperror.AbortWithException(c, apperror.ParamError, err)
 			return
 		}
 
@@ -72,6 +74,7 @@ func Create(postService *service.PostService, publicBaseURL string) gin.HandlerF
 		userID := c.GetUint(middleware.UserIDKey)
 		createdPost, err := postService.Create(service.CreateInput{
 			Type:     postType,
+			Title:    title,
 			Content:  content,
 			ImageURL: imageURL,
 		}, userID)
