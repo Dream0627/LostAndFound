@@ -15,7 +15,7 @@ import (
 	"LAF/pkg/response"
 )
 
-func Delete(postService *service.PostService) gin.HandlerFunc {
+func DeletePost(postService *service.PostService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		postID, err := strconv.ParseUint(c.Param("post_id"), 10, 64)
 		if err != nil || postID == 0 {
@@ -40,7 +40,7 @@ func Delete(postService *service.PostService) gin.HandlerFunc {
 			return 
 		}
 
-		if err:= postService.Delete(postID); err != nil {
+		if err:= postService.DeletePost(postID); err != nil {
 			apperror.AbortWithError(c, err)
 		}
 		response.Success(c, gin.H{"post_id": postID})

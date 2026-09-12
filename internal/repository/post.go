@@ -36,6 +36,6 @@ func (r *PostRepository) Create(post *model.Post) error {
 	return r.db.Create(post).Error
 }
 
-func (r *PostRepository) Delete(postID uint64) error { 
+func (r *PostRepository) DeletePost(postID uint64) error { 
 	return r.db.Delete(&model.Post{}, postID).Error
 }

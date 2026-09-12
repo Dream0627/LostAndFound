@@ -55,6 +55,6 @@ func (s *PostService) Create(input CreateInput, userID uint) (*model.Post, error
     return post, nil
 }
 
-func (s *PostService) Delete(postID uint64) error { 
-	return s.repository.Delete(postID)
+func (s *PostService) DeletePost(postID uint64) error { 
+	return s.repository.DeletePost(postID)
 }
