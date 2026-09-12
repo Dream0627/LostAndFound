@@ -14,7 +14,7 @@ type User struct {
 
 type Post struct {
     ID        uint64    `gorm:"primaryKey;autoIncrement;comment:帖子ID" json:"id"`
-    UserID    uint      `gorm:"column:user_id;not null;index;comment:作者ID" json:"user_id"`
+    UserID    uint64      `gorm:"column:user_id;not null;index;comment:作者ID" json:"user_id"`
     Type      string    `gorm:"column:type;type:enum('lost','found');not null;default:'lost';comment:帖子类型" json:"type"` 
 	Title     string    `gorm:"column:title;type:varchar(2000);not null" json:"title"`
     ImageURL  *string   `gorm:"column:image_url;type:varchar(1024);default:null;comment:图片URL" json:"image_url"`       
@@ -22,4 +22,5 @@ type Post struct {
 	IsFinished bool     `gorm:"column:is_finished;type:bool;default:false" json:"is_finished"`
     CreatedAt time.Time `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);index" json:"created_at"`
     UpdatedAt time.Time `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);index" json:"updated_at"`
+	DeletedAt time.Time `gorm:"column:deleted_at;type:datetime(3);default:null;index" json:"deleted_at"`
 }

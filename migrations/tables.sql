@@ -1,8 +1,8 @@
 USE `laf_db`
 
-DROP TABLE IF EXISTS users;
-
 DROP TABLE IF EXISTS posts;
+
+DROP TABLE IF EXISTS users;
 
 CREATE TABLE users (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '用户ID',
@@ -26,6 +26,7 @@ CREATE TABLE posts (
     is_finished BOOLEAN DEFAULT FALSE COMMENT '帖子是否完成',
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    deleted_at DATETIME(3) DEFAULT NULL,
     KEY idx_posts_user_id (user_id),
     KEY idx_posts_created_at (created_at DESC, id DESC),
     KEY idx_posts_type (type),

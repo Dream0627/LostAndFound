@@ -19,7 +19,7 @@ func NewPostService(repository *repository.PostRepository) *PostService {
 	return &PostService{repository: repository}
 }
 
-func (s *PostService) GetPostByID(postID uint) (*model.Post, error) { 
+func (s *PostService) GetPostByID(postID uint64) (*model.Post, error) { 
 	return s.repository.GetPostByID(postID)
 }
 
@@ -30,7 +30,7 @@ type CreateInput struct {
     ImageURL *string
 }
 
-func (s *PostService) Create(input CreateInput, userID uint) (*model.Post, error) {
+func (s *PostService) Create(input CreateInput, userID uint64) (*model.Post, error) {
     if input.Type != "lost" && input.Type != "found" {
         return nil, apperror.ParamError
     }

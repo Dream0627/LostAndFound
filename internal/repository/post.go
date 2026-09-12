@@ -20,7 +20,7 @@ func NewPostRepository(db *gorm.DB) *PostRepository {
 	return &PostRepository{db: db}
 }
 
-func (r *PostRepository) GetPostByID(postID uint) (*model.Post, error) { 
+func (r *PostRepository) GetPostByID(postID uint64) (*model.Post, error) { 
 	var post model.Post
 	err := r.db.Where("id = ?", postID).First(&post).Error
 	if err != nil { 

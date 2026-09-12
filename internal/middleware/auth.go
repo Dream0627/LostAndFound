@@ -18,7 +18,7 @@ const (
 )
 
 type authClaims struct {
-	UserID uint `json:"user_id"`
+	UserID uint64 `json:"user_id"`
 	Role string `json:"role"`
 	jwt.RegisteredClaims
 }
@@ -96,10 +96,10 @@ func RequireRole(allowedRoles []string) gin.HandlerFunc {
     }
 }
 
-func CurrentUserID(c *gin.Context) (uint, bool) { 
+func CurrentUserID(c *gin.Context) (uint64, bool) { 
 	userID, ok := c.Get(UserIDKey)
 	if !ok {
 		return 0, false
 	}
-	return userID.(uint), true
+	return userID.(uint64), true
 }

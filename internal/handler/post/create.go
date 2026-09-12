@@ -71,13 +71,13 @@ func Create(postService *service.PostService, publicBaseURL string) gin.HandlerF
 			}
 		}
 
-		userID := c.GetUint(middleware.UserIDKey)
+		userID, _ := c.Get(middleware.UserIDKey)
 		createdPost, err := postService.Create(service.CreateInput{
 			Type:     postType,
 			Title:    title,
 			Content:  content,
 			ImageURL: imageURL,
-		}, userID)
+		}, userID.(uint64))
 
 		if err != nil {
 			apperror.AbortWithError(c, err)

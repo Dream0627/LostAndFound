@@ -25,7 +25,7 @@ func DeletePost(postService *service.PostService) gin.HandlerFunc {
 
 		nowUserID, _ := middleware.CurrentUserID(c)
 		nowUserRole , _ := middleware.CurrentRole(c)
-		post, err := postService.GetPostByID(uint(postID))
+		post, err := postService.GetPostByID(postID)
 		
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
