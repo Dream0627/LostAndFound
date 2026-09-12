@@ -18,3 +18,7 @@ type 帖子类型（lost挂失，found寻主）
 title 标题
 content 内容
 image File类型（选择图片（想上传点别的也行））
+
+删帖
+jwt（Bearer token内容）注意空格
+post_id 帖子id
