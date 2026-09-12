@@ -12,11 +12,15 @@ import (
 )
 
 type PostService struct { 
-	db *repository.PostRepository
+	repository *repository.PostRepository
 }
 
-func NewPostService(db *repository.PostRepository) *PostService { 
-	return &PostService{db: db}
+func NewPostService(repository *repository.PostRepository) *PostService { 
+	return &PostService{repository: repository}
+}
+
+func (s *PostService) GetPostByID(postID uint) (*model.Post, error) { 
+	return s.repository.GetPostByID(postID)
 }
 
 type CreateInput struct {
@@ -44,9 +48,13 @@ func (s *PostService) Create(input CreateInput, userID uint) (*model.Post, error
         UserID:   userID,
     }
 
-    if err := s.db.Create(post); err != nil {
+    if err := s.repository.Create(post); err != nil {
         return nil, apperror.ServerError
     }
 
     return post, nil
+}
+
+func (s *PostService) Delete(postID uint64) error { 
+	return s.repository.Delete(postID)
 }

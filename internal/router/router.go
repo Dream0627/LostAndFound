@@ -36,6 +36,7 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, publicBaseURL string) *gin.Eng
 
 	post := engine.Group("/api/v1/posts")
 	post.POST("", middleware.Auth(jwtConfig), posthandler.Create(postService, publicBaseURL))
+	post.DELETE("/:post_id", middleware.Auth(jwtConfig),posthandler.Delete(postService))
 
 	// admin := engine.Group("/api/v1/admin")
 	// admin.Use(middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}))
