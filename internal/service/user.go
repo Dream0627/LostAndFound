@@ -70,7 +70,7 @@ func (s *UserService) Register(input RegisterInput) (*model.User, error) {
 	// }
 
 	if _, err := s.repository.FindByUsername(input.Username); err == nil {
-		return nil, apperror.RepeatError
+		return nil, apperror.UserRepeatError
 	} else if !errors.Is(err, repository.ErrUserNotFound) {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func (s *UserService) Register(input RegisterInput) (*model.User, error) {
 	}
 	if err := s.repository.Create(user); err != nil {
 		if errors.Is(err, repository.ErrUserExists) {
-			return nil, apperror.RepeatError
+			return nil, apperror.UserRepeatError
 		}
 		return nil, err
 	}

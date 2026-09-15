@@ -23,6 +23,21 @@ func (s *PostService) GetPostByID(postID uint64) (*model.Post, error) {
 	return s.repository.GetPostByID(postID)
 }
 
+func (s *PostService) GetPostByIDUnscoped(postID uint64) (*model.Post, error) { 
+	return s.repository.GetPostByIDUnscoped(postID)
+}
+
+func (s *PostService) CheckpostPermission(userID uint64, role string, post *model.Post) error { 
+	if role == "student" { 
+		if post.UserID == userID { 
+			return nil
+		}
+	} else if role == "postadmin" || role == "mainadmin" { 
+		return nil
+	}
+    return apperror.UserForbiddenError
+}
+
 type CreateInput struct {
     Type     string
     Title    string
@@ -57,4 +72,8 @@ func (s *PostService) Create(input CreateInput, userID uint64) (*model.Post, err
 
 func (s *PostService) DeletePost(postID uint64) error { 
 	return s.repository.DeletePost(postID)
+}
+
+func (s *PostService) RecoverPost(postID uint64) error { 
+	return s.repository.RecoverPost(postID)
 }

@@ -28,6 +28,7 @@ var (
 	UserForbiddenError   = NewError(403, "无权删除他人的帖子")
 	AdminForbiddenError  = NewError(403, "仅管理员可删除任意帖子")
 	NotFoundError   = NewError(404, "帖子不存在")
-	RepeatError     = NewError(409, "用户名已存在")
+	UserRepeatError     = NewError(409, "用户名已存在")
+	PostRepeatError     = NewError(409, "帖子已存在")
 	UserNotFoundError = NewError(404, "用户不存在")
 )
