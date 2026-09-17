@@ -33,6 +33,6 @@ CREATE TABLE posts (
     KEY idx_posts_type (type),
     CONSTRAINT fk_posts_user
         FOREIGN KEY (user_id) REFERENCES users(id)
-        ON UPDATE RESTRICT ON DELETE RESTRICT,
+        ON UPDATE RESTRICT ON DELETE CASCADE,
     CONSTRAINT chk_posts_content_not_empty CHECK (CHAR_LENGTH(content) BETWEEN 1 AND 2000)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
