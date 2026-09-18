@@ -68,7 +68,6 @@ func Auth(jwtConfig config.JWTConfig) gin.HandlerFunc {
 	}
 }
 
-// OptionalAuth 解析可选的 Authorization 头，令牌有效时写入用户身份，无效或缺失时不拦截请求
 func OptionalAuth(jwtConfig config.JWTConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenString, err := bearerToken(c.GetHeader("Authorization"))

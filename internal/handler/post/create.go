@@ -30,7 +30,7 @@ func buildPublicImageURL(publicBaseURL, relativePath string) string {
 	return fmt.Sprintf("%s/%s", base, path)
 }
 
-//处理发布帖子数据
+
 func Create(postService *service.PostService, publicBaseURL string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		postType := c.PostForm("type")

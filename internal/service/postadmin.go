@@ -18,7 +18,6 @@ func IsValidPostStatus(status string) bool {
 	return status == model.PostStatusPending || status == model.PostStatusApproved || status == model.PostStatusRejected
 }
 
-// ReviewPost 管理员审核帖子,仅允许审核中(pending)的帖子通过或驳回,不可再次审核
 func (s *PostAdminService) ReviewPost(postID uint64, status string) error {
 	if status != model.PostStatusApproved && status != model.PostStatusRejected {
 		return apperror.InvalidPostStatusError
@@ -35,7 +34,6 @@ func (s *PostAdminService) ReviewPost(postID uint64, status string) error {
 	return s.repository.UpdatePostStatus(postID, status)
 }
 
-// UpdatePostStatus 管理员直接修改帖子状态(任意状态)
 func (s *PostAdminService) UpdatePostStatus(postID uint64, status string) error {
 	if !IsValidPostStatus(status) {
 		return apperror.InvalidPostStatusError

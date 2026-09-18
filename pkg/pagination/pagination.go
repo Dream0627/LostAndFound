@@ -7,7 +7,6 @@ const (
 	MaxPageSize     = 100
 )
 
-// Parse 解析 page 与 page_size,page 至少为 1,page_size 默认 20、上限 100
 func Parse(pageValue, pageSizeValue string) (int, int) {
 	page := 1
 	pageSize := DefaultPageSize
