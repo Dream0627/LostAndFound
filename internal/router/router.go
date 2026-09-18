@@ -58,15 +58,9 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, publicBaseURL string) *gin.Eng
 	admin.PATCH("/posts/:post_id/status", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.UpdatePostStatus(postAdminService))
 	admin.GET("/posts/deleted", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.ListDeletedPosts(postAdminService))
 
-	// admin := engine.Group("/api/v1/admin")
-	// admin.Use(middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}))
-	// admin.DELETE("/posts/:post_id", postadminhandler.DeletePost(postAdminService))
-
 	// postadmin := admin.Group("/postadmin")
-	// postadmin.Use(middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin"}))
 
 	// mainadmin := admin.Group("/mainadmin")
-	// mainadmin.Use(middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}))
 
 	return engine
 }
