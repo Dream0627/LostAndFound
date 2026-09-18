@@ -49,7 +49,12 @@ func (r *PostRepository) Create(post *model.Post) error {
 }
 
 func (r *PostRepository) DeletePost(postID uint64) error { 
-	return r.db.Delete(&model.Post{}, postID).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("post_id = ?", postID).Delete(&model.Comment{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&model.Post{}, postID).Error
+	})
 }
 
 func (r *PostRepository) RecoverPost(postID uint64) error { 

@@ -1,5 +1,7 @@
 USE `laf_db`
 
+DROP TABLE IF EXISTS comments;
+
 DROP TABLE IF EXISTS posts;
 
 DROP TABLE IF EXISTS users;
@@ -35,4 +37,24 @@ CREATE TABLE posts (
         FOREIGN KEY (user_id) REFERENCES users(id)
         ON UPDATE RESTRICT ON DELETE CASCADE,
     CONSTRAINT chk_posts_content_not_empty CHECK (CHAR_LENGTH(content) BETWEEN 1 AND 2000)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE comments (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '评论ID',
+    post_id BIGINT UNSIGNED NOT NULL COMMENT '所属帖子ID',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '评论作者ID',
+    content VARCHAR(1000) NOT NULL COMMENT '评论内容',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    deleted_at DATETIME(3) DEFAULT NULL,
+    KEY idx_comments_post_id (post_id),
+    KEY idx_comments_user_id (user_id),
+    KEY idx_comments_created_at (created_at DESC, id DESC),
+    CONSTRAINT fk_comments_post
+        FOREIGN KEY (post_id) REFERENCES posts(id)
+        ON UPDATE RESTRICT ON DELETE CASCADE,
+    CONSTRAINT fk_comments_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+        ON UPDATE RESTRICT ON DELETE CASCADE,
+    CONSTRAINT chk_comments_content_not_empty CHECK (CHAR_LENGTH(content) BETWEEN 1 AND 1000)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

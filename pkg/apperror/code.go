@@ -32,4 +32,5 @@ var (
 	PostRepeatError     = NewError(409, "帖子已存在")
 	UserNotFoundError = NewError(404, "用户不存在")
 	OldPasswordError  = NewError(400, "原密码错误")
+	CommentNotFoundError = NewError(404, "评论不存在")
 )
