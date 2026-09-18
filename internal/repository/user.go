@@ -60,3 +60,20 @@ func (r *UserRepository) GetProfile(userID uint64) (*model.User, error) {
 	}
 	return &user, nil
 }
+
+func (r *UserRepository) GetUserByID(userID uint64) (*model.User, error) { 
+	var user model.User
+	err := r.db.Where("id = ?", userID).First(&user).Error
+	if err != nil { 
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *UserRepository) UpdateProfile(userID uint64, updates map[string]interface{}) error { 
+	err := r.db.Model(&model.User{}).Where("id = ?", userID).Updates(updates).Error
+	if err != nil { 
+		return err
+	}
+	return nil
+}

@@ -159,3 +159,30 @@ func (s *UserService) GetProfile(userID uint64) (*GetProfileResult, error) {
 
 	return data, nil
 }
+
+func (s *UserService) GetUserByID(userID uint64) (*model.User, error) {
+	return s.repository.GetUserByID(userID)
+}
+
+type UpdateProfileInput struct {
+	Name string `json:"name"`
+	Username string `json:"username"`
+}
+
+func (s *UserService) UpdateProfile(userID uint64, input UpdateProfileInput) error {
+
+	updates := make(map[string]interface{})
+
+	if input.Name != "" {
+		updates["name"] = input.Name
+	}
+	if input.Username != "" {
+		updates["username"] = input.Username
+	}
+
+	if len(updates) == 0 {
+		return nil
+	}
+
+	return s.repository.UpdateProfile(userID, updates)
+}
