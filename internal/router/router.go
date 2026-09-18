@@ -33,6 +33,7 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, publicBaseURL string) *gin.Eng
 	auth := engine.Group("/api/v1/auth")
 	auth.POST("/register", userhandler.Register(userService))
 	auth.POST("/login", userhandler.Login(userService))
+	auth.GET("/profile", middleware.Auth(jwtConfig), userhandler.GetProfile(userService))
 
 	post := engine.Group("/api/v1/posts")
 	post.POST("", middleware.Auth(jwtConfig), posthandler.Create(postService, publicBaseURL))

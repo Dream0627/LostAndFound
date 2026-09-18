@@ -130,3 +130,32 @@ func (s *UserService) Login(username, password string) (*LoginResult, error) {
 		User: user,
 	}, nil
 }
+
+func (s *UserService) GetPostsByUserID(userID uint64) ([]*model.Post, error) {
+	posts, err := s.repository.GetPostsByUserID(userID)
+	if err != nil {
+		return nil, err
+	}
+	return posts, nil
+}
+
+type GetProfileResult struct {
+	User *model.User `json:"user"`
+	Posts []*model.Post `json:"posts"`
+}
+
+func (s *UserService) GetProfile(userID uint64) (*GetProfileResult, error) {
+	user, err := s.repository.GetProfile(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	userPosts, err := s.GetPostsByUserID(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	data := &GetProfileResult{User: user, Posts: userPosts}
+
+	return data, nil
+}

@@ -42,3 +42,21 @@ func (r *UserRepository) FindByUsername(username string) (*model.User, error) {
 	}
 	return &user, nil
 }
+
+func (r *UserRepository) GetPostsByUserID(userID uint64) ([]*model.Post, error) { 
+	var posts []*model.Post
+	err := r.db.Order("id desc").Where("user_id = ?", userID).Find(&posts).Error
+	if err != nil { 
+		return nil, err
+	}
+	return posts, nil
+}
+
+func (r *UserRepository) GetProfile(userID uint64) (*model.User, error) { 
+	var user model.User
+	err := r.db.Where("id = ?", userID).First(&user).Error
+	if err != nil { 
+		return nil, err
+	}
+	return &user, nil
+}
