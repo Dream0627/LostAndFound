@@ -6,6 +6,12 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	PostStatusPending  = "pending"
+	PostStatusApproved = "approved"
+	PostStatusRejected = "rejected"
+)
+
 type User struct {
 	ID           uint64    `gorm:"primaryKey;autoIncrement;comment:用户ID" json:"id"`
 	Username     string    `gorm:"column:username;type:varchar(32);unique;not null,comment:学号或管理员工号" json:"username"`
@@ -25,6 +31,7 @@ type Post struct {
 	ImageURL   *string        `gorm:"column:image_url;type:varchar(1024);default:null;comment:图片URL" json:"image_url"`
 	Content    string         `gorm:"column:content;type:varchar(2000);not null" json:"content"`
 	IsFinished bool           `gorm:"column:is_finished;type:bool;default:false" json:"is_finished"`
+	Status     string         `gorm:"column:status;type:enum('pending','approved','rejected');not null;default:'pending';index;comment:审核状态" json:"status"`
 	CreatedAt  time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);index" json:"created_at"`
 	UpdatedAt  time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);index" json:"updated_at"`
 	DeletedAt  gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at"`

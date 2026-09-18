@@ -27,12 +27,14 @@ CREATE TABLE posts (
     content VARCHAR(2000) NOT NULL,
     image_url VARCHAR(1024) DEFAULT NULL COMMENT '帖子图片的相对路径或URL',
     is_finished BOOLEAN DEFAULT FALSE COMMENT '帖子是否完成',
+    status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending' COMMENT '审核状态: pending-审核中, approved-已通过, rejected-未通过',
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     deleted_at DATETIME(3) DEFAULT NULL,
     KEY idx_posts_user_id (user_id),
     KEY idx_posts_created_at (created_at DESC, id DESC),
     KEY idx_posts_type (type),
+    KEY idx_posts_status (status), 
     CONSTRAINT fk_posts_user
         FOREIGN KEY (user_id) REFERENCES users(id)
         ON UPDATE RESTRICT ON DELETE CASCADE,

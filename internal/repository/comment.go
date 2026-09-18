@@ -36,13 +36,21 @@ func (r *CommentRepository) GetCommentByID(commentID uint64) (*model.Comment, er
 	return &comment, nil
 }
 
-func (r *CommentRepository) GetCommentsByPostID(postID uint64, limit, offset int) ([]*model.Comment, error) {
+func (r *CommentRepository) GetCommentsByPostID(postID uint64, limit, offset int) ([]*model.Comment, int64, error) {
 	var comments []*model.Comment
-	err := r.db.Order("id desc").Where("post_id = ?", postID).Limit(limit).Offset(offset).Find(&comments).Error
-	if err != nil {
-		return nil, err
+	var total int64
+
+	buildQuery := func() *gorm.DB {
+		return r.db.Model(&model.Comment{}).Where("post_id = ?", postID)
 	}
-	return comments, nil
+
+	if err := buildQuery().Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	if err := buildQuery().Order("id desc").Limit(limit).Offset(offset).Find(&comments).Error; err != nil {
+		return nil, 0, err
+	}
+	return comments, total, nil
 }
 
 func (r *CommentRepository) DeleteComment(commentID uint64) error {

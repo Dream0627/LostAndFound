@@ -10,7 +10,7 @@ import (
 	userhandler "LAF/internal/handler/user"
 	commenthandler "LAF/internal/handler/comment"
 
-	//postadminhandler "LAF/internal/handler/postadmin"
+	postadminhandler "LAF/internal/handler/postadmin"
 	//mainadminhandler "LAF/internal/handler/mainadmin"
 	"LAF/internal/middleware"
 	"LAF/internal/repository"
@@ -26,6 +26,7 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, publicBaseURL string) *gin.Eng
 	userService := service.NewUserService(userRepository, jwtConfig)
 	postRepository := repository.NewPostRepository(db)
 	postService := service.NewPostService(postRepository)
+	postAdminService := service.NewPostAdminService(postRepository)
 	commentRepository := repository.NewCommentRepository(db)
 	commentService := service.NewCommentService(commentRepository, postRepository)
 	//postAdminRepository := repository.NewPostAdminRepository(db)
@@ -41,14 +42,21 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, publicBaseURL string) *gin.Eng
 	auth.PATCH("/password", middleware.Auth(jwtConfig), userhandler.UpdatePassword(userService))
 
 	post := engine.Group("/api/v1/posts")
+	post.GET("", middleware.OptionalAuth(jwtConfig), posthandler.ListPosts(postService))
 	post.POST("", middleware.Auth(jwtConfig), posthandler.Create(postService, publicBaseURL))
+	post.GET("/:post_id", middleware.OptionalAuth(jwtConfig), posthandler.GetPost(postService))
 	post.DELETE("/:post_id", middleware.Auth(jwtConfig),posthandler.DeletePost(postService))
 	post.PATCH("/:post_id/recover", middleware.Auth(jwtConfig),posthandler.RecoverPost(postService))
+	post.PATCH("/:post_id/review", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.ReviewPost(postAdminService))
 	post.GET("/:post_id/comments", commenthandler.List(commentService))
 	post.POST("/:post_id/comments", middleware.Auth(jwtConfig), commenthandler.Create(commentService))
 
 	comment := engine.Group("/api/v1/comments")
 	comment.DELETE("/:comment_id", middleware.Auth(jwtConfig), commenthandler.Delete(commentService))
+
+	admin := engine.Group("/api/v1/admin")
+	admin.PATCH("/posts/:post_id/status", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.UpdatePostStatus(postAdminService))
+	admin.GET("/posts/deleted", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.ListDeletedPosts(postAdminService))
 
 	// admin := engine.Group("/api/v1/admin")
 	// admin.Use(middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}))

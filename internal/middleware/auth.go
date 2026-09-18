@@ -68,6 +68,39 @@ func Auth(jwtConfig config.JWTConfig) gin.HandlerFunc {
 	}
 }
 
+// OptionalAuth 解析可选的 Authorization 头，令牌有效时写入用户身份，无效或缺失时不拦截请求
+func OptionalAuth(jwtConfig config.JWTConfig) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokenString, err := bearerToken(c.GetHeader("Authorization"))
+		if err != nil || jwtConfig.Secret == "" {
+			c.Next()
+			return
+		}
+
+		claims := &authClaims{}
+		token, err := jwt.ParseWithClaims(
+			tokenString,
+			claims,
+			func(token *jwt.Token) (any, error) {
+				if token.Method != jwt.SigningMethodHS256 {
+					return nil, errors.New("unexpected jwt signing method")
+				}
+				return []byte(jwtConfig.Secret), nil
+			},
+			jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+			jwt.WithExpirationRequired(),
+		)
+		if err != nil || !token.Valid || claims.Role == "" || claims.UserID == 0 {
+			c.Next()
+			return
+		}
+
+		c.Set(UserIDKey, claims.UserID)
+		c.Set(RoleKey, claims.Role)
+		c.Next()
+	}
+}
+
 func CurrentRole(c *gin.Context) (string, bool) {
 	role, ok := c.Get(RoleKey)
 	if !ok {

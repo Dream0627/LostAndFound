@@ -71,13 +71,14 @@ func Create(postService *service.PostService, publicBaseURL string) gin.HandlerF
 			}
 		}
 
-		userID, _ := c.Get(middleware.UserIDKey)
+		nowUserID, _ := middleware.CurrentUserID(c)
+		nowUserRole, _ := middleware.CurrentRole(c)
 		createdPost, err := postService.Create(service.CreateInput{
 			Type:     postType,
 			Title:    title,
 			Content:  content,
 			ImageURL: imageURL,
-		}, userID.(uint64))
+		}, nowUserID, nowUserRole)
 
 		if err != nil {
 			apperror.AbortWithError(c, err)

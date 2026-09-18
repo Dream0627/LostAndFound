@@ -8,6 +8,7 @@ import (
 
 	"LAF/internal/service"
 	"LAF/pkg/apperror"
+	"LAF/pkg/pagination"
 	"LAF/pkg/response"
 )
 
@@ -19,23 +20,9 @@ func List(commentService *service.CommentService) gin.HandlerFunc {
 			return
 		}
 
-		limit := 20
-		offset := 0
-		if v := c.Query("limit"); v != "" {
-			if n, err := strconv.Atoi(v); err == nil && n > 0 {
-				limit = n
-			}
-		}
-		if v := c.Query("offset"); v != "" {
-			if n, err := strconv.Atoi(v); err == nil && n >= 0 {
-				offset = n
-			}
-		}
-		if limit > 100 {
-			limit = 100
-		}
+		page, pageSize := pagination.Parse(c.Query("page"), c.Query("page_size"))
 
-		comments, err := commentService.GetCommentsByPostID(postID, limit, offset)
+		comments, err := commentService.GetCommentsByPostID(postID, page, pageSize)
 		if err != nil {
 			apperror.AbortWithError(c, err)
 			return

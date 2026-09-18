@@ -59,8 +59,25 @@ func (s *CommentService) GetCommentByID(commentID uint64) (*model.Comment, error
 	return comment, nil
 }
 
-func (s *CommentService) GetCommentsByPostID(postID uint64, limit, offset int) ([]*model.Comment, error) {
-	return s.repository.GetCommentsByPostID(postID, limit, offset)
+type CommentListResult struct {
+	List     []*model.Comment `json:"list"`
+	Total    int64            `json:"total"`
+	Page     int              `json:"page"`
+	PageSize int              `json:"page_size"`
+}
+
+func (s *CommentService) GetCommentsByPostID(postID uint64, page, pageSize int) (*CommentListResult, error) {
+	offset := (page - 1) * pageSize
+	comments, total, err := s.repository.GetCommentsByPostID(postID, pageSize, offset)
+	if err != nil {
+		return nil, err
+	}
+	return &CommentListResult{
+		List:     comments,
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+	}, nil
 }
 
 func (s *CommentService) CheckCommentPermission(userID uint64, role string, comment *model.Comment) error {
