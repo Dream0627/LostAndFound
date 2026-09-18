@@ -54,6 +54,7 @@ func Load() (*Config, error) {
 			return
 		}
 		fmt.Println("重新加载配置成功", e.Name)
+		fmt.Println("注意：jwt/database 配置已在启动时注入各服务，本次热更新不会生效，需重启服务")
 	})
 
 	return &cfg, nil

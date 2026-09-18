@@ -7,7 +7,6 @@ import (
 	//"fmt"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 
 	"LAF/internal/middleware"
 	"LAF/internal/service"
@@ -28,20 +27,22 @@ func DeletePost(postService *service.PostService) gin.HandlerFunc {
 		post, err := postService.GetPostByID(postID)
 		
 		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
+			if errors.Is(err, apperror.NotFoundError) {
 				apperror.AbortWithException(c, apperror.NotFoundError, nil)
 			} else {
 				apperror.AbortWithError(c, err)
 			}
-			return 
+			return
 		}
 
 		if err := postService.CheckpostPermission(nowUserID, nowUserRole, post); err != nil {
 			apperror.AbortWithException(c, apperror.UserForbiddenError, nil)
+			return
 		}
 
-		if err:= postService.DeletePost(postID); err != nil {
+		if err := postService.DeletePost(postID); err != nil {
 			apperror.AbortWithError(c, err)
+			return
 		}
 		response.Success(c, gin.H{"post_id": postID})
 	}

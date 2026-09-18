@@ -186,3 +186,40 @@ func (s *UserService) UpdateProfile(userID uint64, input UpdateProfileInput) err
 
 	return s.repository.UpdateProfile(userID, updates)
 }
+
+type UpdatePasswordInput struct {
+	OldPassword     string `json:"old_password"`
+	NewPassword     string `json:"new_password"`
+	ConfirmPassword string `json:"confirm_password"`
+}
+
+func (s *UserService) UpdatePassword(userID uint64, input UpdatePasswordInput) error {
+	if len(input.NewPassword) < 8 || len(input.NewPassword) > 16 {
+		return apperror.ParamError
+	}
+
+	if input.NewPassword != input.ConfirmPassword {
+		return apperror.ParamError
+	}
+
+	user, err := s.repository.GetUserByID(userID)
+	if errors.Is(err, repository.ErrUserNotFound) {
+		return apperror.UserNotFoundError
+	}
+	if err != nil {
+		return err
+	}
+
+	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.OldPassword)) != nil {
+		return apperror.OldPasswordError
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(input.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	return s.repository.UpdateProfile(userID, map[string]interface{}{
+		"password_hash": string(passwordHash),
+	})
+}

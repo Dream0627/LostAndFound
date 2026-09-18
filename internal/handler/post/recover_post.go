@@ -35,10 +35,12 @@ func RecoverPost(postService *service.PostService) gin.HandlerFunc {
 
 		if err := postService.CheckpostPermission(nowUserID, nowUserRole, post); err != nil {
 			apperror.AbortWithException(c, apperror.UserForbiddenError, nil)
+			return
 		}
 
 		if err := postService.RecoverPost(postID); err != nil {
 			apperror.AbortWithError(c, err)
+			return
 		}
 		response.Success(c, gin.H{"post_id": postID})
 	}

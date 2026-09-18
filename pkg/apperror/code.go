@@ -31,4 +31,5 @@ var (
 	UserRepeatError     = NewError(409, "用户名已存在")
 	PostRepeatError     = NewError(409, "帖子已存在")
 	UserNotFoundError = NewError(404, "用户不存在")
+	OldPasswordError  = NewError(400, "原密码错误")
 )

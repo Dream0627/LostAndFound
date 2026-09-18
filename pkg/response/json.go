@@ -24,5 +24,9 @@ func Success(c *gin.Context, data interface{}) {
 }
 
 func Error(c *gin.Context, code int, msg string) {
-	JSON(c, code, code, msg, nil)
+	httpStatus := code
+	if httpStatus < 100 || httpStatus > 599 {
+		httpStatus = http.StatusInternalServerError
+	}
+	JSON(c, httpStatus, code, msg, nil)
 }
