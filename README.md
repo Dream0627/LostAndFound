@@ -258,14 +258,6 @@
 
 ---
 
-## 分页约定
-
-- 对外统一 `page`（从 1 开始）与 `page_size`（默认 20，上限 100），不再暴露 `limit/offset`
-- 返回信封统一含 `{ list, total, page, page_size }`
-- 内部由 `pkg/pagination.Parse` 解析，`offset = (page - 1) * page_size`
-
----
-
 ## 文件上传说明
 
 - 仅「发布帖子」支持图片上传（字段名 `image`）
@@ -283,16 +275,6 @@
 5. **列表为何返回空？** 普通用户强制只看 `approved`，无匹配则为空数组。
 6. **token 失效怎么办？** 重新登录获取新 `access_token` 并替换请求头。
 7. **如何成为管理员？** 代码中注册角色校验 `role != "student"` 已被注释（临时放开）；生产环境请由后台创建管理员账号。
-
----
-
-## 开发注意事项（与代码保持一致）
-
-- **CRLF 换行**：项目源文件均为 CRLF；用 `gofmt -e` 做语法校验，`gofmt -l` 全仓报错属既有现象。
-- **Abort 后必须 return**：每个 `AbortWithException` / `AbortWithError` 之后紧跟 `return`，避免权限绕过与重复写响应。
-- **软删除不触发外键级联**：删父表（帖子）时在事务内先软删子表（评论）；DDL 的外键级联仅作物理删除兜底。
-- **模型与 DDL 同步**：改字段时同时修改 `internal/model/model.go` 与 `migrations/tables.sql`。
-- **沙箱编译**：沙箱无 Go toolchain，交付时用 `gofmt -e` 校验语法；请在本地运行 `go build ./...` 做最终编译确认。
 
 ---
 
