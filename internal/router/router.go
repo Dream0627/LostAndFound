@@ -49,9 +49,9 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, publicBaseURL string) *gin.Eng
 	post.PATCH("/:post_id/recover", middleware.Auth(jwtConfig),posthandler.RecoverPost(postService))
 	post.PATCH("/:post_id/review", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.ReviewPost(postAdminService))
 	post.GET("/:post_id/comments", commenthandler.List(commentService))
-	post.POST("/:post_id/comments", middleware.Auth(jwtConfig), commenthandler.Create(commentService))
 
 	comment := engine.Group("/api/v1/comments")
+	comment.POST("", middleware.Auth(jwtConfig), commenthandler.Create(commentService))
 	comment.DELETE("/:comment_id", middleware.Auth(jwtConfig), commenthandler.Delete(commentService))
 
 	admin := engine.Group("/api/v1/admin")

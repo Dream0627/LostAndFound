@@ -2,8 +2,6 @@
 package comment
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
 	"LAF/internal/middleware"
@@ -13,17 +11,12 @@ import (
 )
 
 type CreateCommentRequest struct {
+	PostID  uint64 `json:"post_id" binding:"required"`
 	Content string `json:"content" binding:"required"`
 }
 
 func Create(commentService *service.CommentService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		postID, err := strconv.ParseUint(c.Param("post_id"), 10, 64)
-		if err != nil || postID == 0 {
-			apperror.AbortWithException(c, apperror.ParamError, err)
-			return
-		}
-
 		nowUserID, _ := middleware.CurrentUserID(c)
 
 		var request CreateCommentRequest
@@ -32,7 +25,8 @@ func Create(commentService *service.CommentService) gin.HandlerFunc {
 			return
 		}
 
-		createdComment, err := commentService.Create(postID, nowUserID, service.CreateCommentInput{
+		createdComment, err := commentService.Create(nowUserID, service.CreateCommentInput{
+			PostID:  request.PostID,
 			Content: request.Content,
 		})
 		if err != nil {

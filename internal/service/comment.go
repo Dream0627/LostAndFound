@@ -22,11 +22,12 @@ func NewCommentService(repository *repository.CommentRepository, postRepository 
 }
 
 type CreateCommentInput struct {
+	PostID  uint64 `json:"post_id"`
 	Content string `json:"content"`
 }
 
-func (s *CommentService) Create(postID uint64, userID uint64, input CreateCommentInput) (*model.Comment, error) {
-	if _, err := s.postRepository.GetPostByID(postID); err != nil {
+func (s *CommentService) Create(userID uint64, input CreateCommentInput) (*model.Comment, error) {
+	if _, err := s.postRepository.GetPostByID(input.PostID); err != nil {
 		return nil, err
 	}
 
@@ -36,7 +37,7 @@ func (s *CommentService) Create(postID uint64, userID uint64, input CreateCommen
 	}
 
 	comment := &model.Comment{
-		PostID:  postID,
+		PostID:  input.PostID,
 		UserID:  userID,
 		Content: input.Content,
 	}
