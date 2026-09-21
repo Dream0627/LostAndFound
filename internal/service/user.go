@@ -210,7 +210,11 @@ func (s *UserService) UpdateProfile(userID uint64, input UpdateProfileInput) err
 		return nil
 	}
 
-	return s.repository.UpdateProfile(userID, updates)
+	err := s.repository.UpdateProfile(userID, updates)
+	if errors.Is(err, repository.ErrUserExists) {
+		return apperror.UserRepeatError
+	}
+	return err
 }
 
 // UpdatePasswordInput 是修改密码的入参：原密码、新密码、确认密码。

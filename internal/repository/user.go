@@ -90,7 +90,11 @@ func (r *UserRepository) GetUserByID(userID uint64) (*model.User, error) {
 // 用 map[string]interface{} 而不是整个结构体，是为了避免把未填字段覆盖成零值。
 func (r *UserRepository) UpdateProfile(userID uint64, updates map[string]interface{}) error { 
 	err := r.db.Model(&model.User{}).Where("id = ?", userID).Updates(updates).Error
-	if err != nil { 
+	var mysqlErr *mysql.MySQLError
+	if errors.Is(err, gorm.ErrDuplicatedKey) || (errors.As(err, &mysqlErr) && mysqlErr.Number == 1062) {
+		return ErrUserExists
+	}
+	if err != nil {
 		return apperror.DatabaseError
 	}
 	return nil
