@@ -1,3 +1,4 @@
+// 本文件是用户相关的业务逻辑：注册、登录(签发 JWT)、资料查询与更新、修改密码。
 package service
 
 import (
@@ -16,13 +17,17 @@ import (
 	"LAF/pkg/apperror"
 )
 
+// 预先编译好的正则：要求用户名必须“全是数字”(本项目学号/工号均为数字)。
+// 预编译一次可避免每次注册都重新编译，提升效率。
 var numericUsername = regexp.MustCompile(`^[0-9]+$`)
 
+// UserService 依赖用户仓库和 JWT 配置(登录时要用密钥与有效期签发令牌)。
 type UserService struct {
 	repository *repository.UserRepository
 	jwt        config.JWTConfig
 }
 
+// RegisterInput 是注册的业务入参 DTO。
 type RegisterInput struct {
 	Username string
 	Name     string
@@ -30,6 +35,7 @@ type RegisterInput struct {
 	Role     string
 }
 
+// LoginResult 是登录成功后的返回：令牌本身、令牌类型、有效期与用户信息。
 type LoginResult struct {
 	AccessToken string `json:"access_token"`
 	TokenType  string `json:"token_type"`
@@ -37,12 +43,14 @@ type LoginResult struct {
 	User 	    *model.User `json:"user"`
 }
 
+// tokenClaims 是签发的 JWT 载荷：user_id、role 加上标准声明。
 type tokenClaims struct {
 	UserID   uint64  `json:"user_id"`
 	Role     string `json:"role"`
 	jwt.RegisteredClaims
 }
 
+// NewUserService 由 router 注入用户仓库与 JWT 配置。
 func NewUserService(repository *repository.UserRepository, jwtConfig config.JWTConfig) *UserService {
 	return &UserService{
 		repository: repository,
@@ -50,6 +58,13 @@ func NewUserService(repository *repository.UserRepository, jwtConfig config.JWTC
 	}
 }
 
+// Register 处理注册。业务规则：
+//   - 用户名/姓名去空白后长度需在 1~32；
+//   - 密码长度需在 8~16；
+//   - 用户名必须是纯数字；
+//   - 用户名不能重复(先查一次，插入时再兜底捕获唯一键冲突)；
+//   - 密码必须经 bcrypt 哈希后再入库，绝不存明文。
+// 注意：当前“仅允许注册 student 角色”的校验被注释掉了(临时放开)。
 func (s *UserService) Register(input RegisterInput) (*model.User, error) {
 	input.Username = strings.TrimSpace(input.Username)
 	input.Name = strings.TrimSpace(input.Name)
@@ -94,6 +109,9 @@ func (s *UserService) Register(input RegisterInput) (*model.User, error) {
 	return user, nil
 }
 
+// Login 校验账号密码并签发 JWT。
+// 说明：用户不存在与密码错误返回同一个 LoginError，避免被用来探测“某用户名是否存在”。
+// 校验通过后用 HS256 签发令牌，载荷含 user_id 与 role，并设置签发时间与过期时间。
 func (s *UserService) Login(username, password string) (*LoginResult, error) {
 	user, err := s.repository.FindByUsername(strings.TrimSpace(username))
 	if errors.Is(err, repository.ErrUserNotFound) {
@@ -131,6 +149,7 @@ func (s *UserService) Login(username, password string) (*LoginResult, error) {
 	}, nil
 }
 
+// GetPostsByUserID 查询某用户发布的帖子，供个人资料页展示。
 func (s *UserService) GetPostsByUserID(userID uint64) ([]*model.Post, error) {
 	posts, err := s.repository.GetPostsByUserID(userID)
 	if err != nil {
@@ -139,11 +158,13 @@ func (s *UserService) GetPostsByUserID(userID uint64) ([]*model.Post, error) {
 	return posts, nil
 }
 
+// GetProfileResult 是个人资料页的返回：用户信息 + 其发布的帖子。
 type GetProfileResult struct {
 	User *model.User `json:"user"`
 	Posts []*model.Post `json:"posts"`
 }
 
+// GetProfile 组合“用户信息”与“其帖子列表”一并返回。
 func (s *UserService) GetProfile(userID uint64) (*GetProfileResult, error) {
 	user, err := s.repository.GetProfile(userID)
 	if err != nil {
@@ -160,15 +181,20 @@ func (s *UserService) GetProfile(userID uint64) (*GetProfileResult, error) {
 	return data, nil
 }
 
+// GetUserByID 按 ID 查询用户，供改密等需要读取原密码哈希的逻辑使用。
 func (s *UserService) GetUserByID(userID uint64) (*model.User, error) {
 	return s.repository.GetUserByID(userID)
 }
 
+// UpdateProfileInput 是更新资料的入参：只允许改姓名与用户名。
 type UpdateProfileInput struct {
 	Name string `json:"name"`
 	Username string `json:"username"`
 }
 
+// UpdateProfile 只更新“本次传了值”的字段：
+// 用 map 收集非空字段，空字符串表示“不改该项”。
+// 若一个字段都没传，则直接返回，不发无意义的数据库更新。
 func (s *UserService) UpdateProfile(userID uint64, input UpdateProfileInput) error {
 
 	updates := make(map[string]interface{})
@@ -187,12 +213,18 @@ func (s *UserService) UpdateProfile(userID uint64, input UpdateProfileInput) err
 	return s.repository.UpdateProfile(userID, updates)
 }
 
+// UpdatePasswordInput 是修改密码的入参：原密码、新密码、确认密码。
 type UpdatePasswordInput struct {
 	OldPassword     string `json:"old_password"`
 	NewPassword     string `json:"new_password"`
 	ConfirmPassword string `json:"confirm_password"`
 }
 
+// UpdatePassword 修改密码。业务规则：
+//   1) 新密码长度需在 8~16；
+//   2) 两次输入的新密码必须一致；
+//   3) 必须校验原密码正确，防止会话被劫持后直接改密；
+//   4) 新密码同样经 bcrypt 哈希后入库。
 func (s *UserService) UpdatePassword(userID uint64, input UpdatePasswordInput) error {
 	if len(input.NewPassword) < 8 || len(input.NewPassword) > 16 {
 		return apperror.ParamError
