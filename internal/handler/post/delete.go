@@ -29,8 +29,8 @@ func DeletePost(postService *service.PostService) gin.HandlerFunc {
 		post, err := postService.GetPostByID(postID) // 先查帖子，用于权限判断+确认存在
 		
 		if err != nil {
-			if errors.Is(err, apperror.NotFoundError) {
-				apperror.AbortWithException(c, apperror.NotFoundError, nil)
+			if errors.Is(err, apperror.PostNotFoundError) {
+				apperror.AbortWithException(c, apperror.PostNotFoundError, nil)
 			} else {
 				apperror.AbortWithError(c, err)
 			}

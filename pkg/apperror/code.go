@@ -32,20 +32,22 @@ func NewError(code int, msg string) *Error {
 
 // 集中声明全部业务错误。取值约定：
 // 400 参数/入参问题，401 未登录或凭证无效，403 权限不足，404 资源不存在，
-// 409 资源冲突(如用户名已存在)，1000 服务器内部异常。
+// 409 资源冲突(如学号/工号已存在)，1000 服务器内部异常，1001 数据库操作失败。
+// 命名约定：XxxNotFoundError 表示“某类资源不存在”，
+// 如 PostNotFoundError / UserNotFoundError / CommentNotFoundError。
 var (
-	ServerError     = NewError(1000, "系统异常")
-	ParamError      = NewError(400, "参数校验失败")
-	UnauthorizedError = NewError(401, "未登录或令牌无效")
-	LoginError      = NewError(401, "账号或密码错误")
-	UserForbiddenError   = NewError(403, "无权删除他人的帖子")
-	AdminForbiddenError  = NewError(403, "仅管理员可操作")
-	NotFoundError   = NewError(404, "帖子不存在")
-	UserRepeatError     = NewError(409, "用户名已存在")
-	PostRepeatError     = NewError(409, "帖子已存在")
-	UserNotFoundError = NewError(404, "用户不存在")
-	OldPasswordError  = NewError(400, "原密码错误")
-	CommentNotFoundError = NewError(404, "评论不存在")
+	ServerError            = NewError(1000, "系统异常")
+	DatabaseError          = NewError(1001, "数据库操作失败")
+	ParamError             = NewError(400, "参数校验失败")
+	UnauthorizedError      = NewError(401, "未登录或令牌无效")
+	LoginError             = NewError(401, "账号或密码错误")
+	UserForbiddenError     = NewError(403, "无权操作他人资源")
+	AdminForbiddenError    = NewError(403, "仅管理员可操作")
+	PostNotFoundError      = NewError(404, "帖子不存在")
+	UserNotFoundError      = NewError(404, "用户不存在")
+	CommentNotFoundError   = NewError(404, "评论不存在")
+	UserRepeatError        = NewError(409, "该学号或工号已存在")
+	OldPasswordError       = NewError(400, "原密码错误")
 	InvalidPostStatusError = NewError(400, "无效的帖子状态")
 	PostNotPendingError    = NewError(400, "该帖子不可审核")
 )

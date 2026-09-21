@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 
 	"LAF/internal/model"
+	"LAF/pkg/apperror"
 )
 
 // 两个哨兵错误：用户不存在、用户已存在。定义成固定值便于上层用 errors.Is 判断。
@@ -35,7 +36,10 @@ func (r *UserRepository) Create(user *model.User) error {
 	if errors.Is(err, gorm.ErrDuplicatedKey) || errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
 		return ErrUserExists
 	}
-	return err
+	if err != nil {
+		return apperror.DatabaseError
+	}
+	return nil
 }
 
 // FindByUsername 按用户名查询用户(登录、注册查重都会用到)。
@@ -47,7 +51,7 @@ func (r *UserRepository) FindByUsername(username string) (*model.User, error) {
 		return nil, ErrUserNotFound
 	}
 	if err != nil {
-		return nil, err
+		return nil, apperror.DatabaseError
 	}
 	return &user, nil
 }
@@ -57,7 +61,7 @@ func (r *UserRepository) GetPostsByUserID(userID uint64) ([]*model.Post, error) 
 	var posts []*model.Post
 	err := r.db.Order("id desc").Where("user_id = ?", userID).Find(&posts).Error
 	if err != nil { 
-		return nil, err
+		return nil, apperror.DatabaseError
 	}
 	return posts, nil
 }
@@ -67,7 +71,7 @@ func (r *UserRepository) GetProfile(userID uint64) (*model.User, error) {
 	var user model.User
 	err := r.db.Where("id = ?", userID).First(&user).Error
 	if err != nil { 
-		return nil, err
+		return nil, apperror.DatabaseError
 	}
 	return &user, nil
 }
@@ -77,7 +81,7 @@ func (r *UserRepository) GetUserByID(userID uint64) (*model.User, error) {
 	var user model.User
 	err := r.db.Where("id = ?", userID).First(&user).Error
 	if err != nil { 
-		return nil, err
+		return nil, apperror.DatabaseError
 	}
 	return &user, nil
 }
@@ -87,7 +91,7 @@ func (r *UserRepository) GetUserByID(userID uint64) (*model.User, error) {
 func (r *UserRepository) UpdateProfile(userID uint64, updates map[string]interface{}) error { 
 	err := r.db.Model(&model.User{}).Where("id = ?", userID).Updates(updates).Error
 	if err != nil { 
-		return err
+		return apperror.DatabaseError
 	}
 	return nil
 }

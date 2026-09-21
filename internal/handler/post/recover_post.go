@@ -18,7 +18,7 @@ func RecoverPost(postService *service.PostService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		postID, err := strconv.ParseUint(c.Param("post_id"), 10, 64)
 		if err != nil || postID == 0 {
-			response.Error(c, apperror.ParamError.Code, apperror.ParamError.Msg)
+			apperror.AbortWithException(c, apperror.ParamError, nil)
 			return
 		}
 
@@ -27,8 +27,8 @@ func RecoverPost(postService *service.PostService) gin.HandlerFunc {
 		post, err := postService.GetPostByIDUnscoped(postID) // 注意：必须用 Unscoped 版本才能查到已删除的帖子
 
 		if err != nil {
-			if errors.Is(err, apperror.NotFoundError) || err == apperror.NotFoundError {
-				apperror.AbortWithException(c, apperror.NotFoundError, nil)
+			if errors.Is(err, apperror.PostNotFoundError) {
+				apperror.AbortWithException(c, apperror.PostNotFoundError, nil)
 			} else {
 				apperror.AbortWithError(c, err)
 			}

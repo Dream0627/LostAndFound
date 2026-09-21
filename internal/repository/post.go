@@ -25,15 +25,15 @@ func NewPostRepository(db *gorm.DB) *PostRepository {
 }
 
 // GetPostByID 查询未删除的帖子。
-// 查不到时返回 apperror.NotFoundError；其他异常统一返回 apperror.ServerError。
+// 查不到时返回 apperror.PostNotFoundError；其他数据库异常统一返回 apperror.DatabaseError。
 func (r *PostRepository) GetPostByID(postID uint64) (*model.Post, error) { 
 	var post model.Post
 	err := r.db.Where("id = ?", postID).First(&post).Error
 	if err != nil { 
 		if errors.Is(err, gorm.ErrRecordNotFound) { 
-			return nil, apperror.NotFoundError
+			return nil, apperror.PostNotFoundError
 		}
-		return nil, apperror.ServerError
+		return nil, apperror.DatabaseError
 	}
 	return &post, nil
 }
@@ -46,34 +46,44 @@ func (r *PostRepository) GetPostByIDUnscoped(postID uint64) (*model.Post, error)
 	err := r.db.Unscoped().Where("id = ?", postID).First(&post).Error
 	if err != nil { 
 		if errors.Is(err, gorm.ErrRecordNotFound) { 
-			return nil, apperror.NotFoundError
+			return nil, apperror.PostNotFoundError
 		}
-		return nil, apperror.ServerError
+		return nil, apperror.DatabaseError
 	}
 	return &post, nil
 }
 
 // Create 插入一条帖子，自增主键会回填到 post.ID。
 func (r *PostRepository) Create(post *model.Post) error { 
-	return r.db.Create(post).Error
+	if err := r.db.Create(post).Error; err != nil {
+		return apperror.DatabaseError
+	}
+	return nil
 }
 
 // DeletePost 删除帖子，并在同一事务里一并软删除其下所有评论。
 // 为什么要手动删评论？因为软删除只是 UPDATE，不会触发数据库外键级联；
 // 用 Transaction 保证“删评论 + 删帖子”要么都成功、要么都回滚，避免出现半删状态。
 func (r *PostRepository) DeletePost(postID uint64) error { 
-	return r.db.Transaction(func(tx *gorm.DB) error {
+	err := r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("post_id = ?", postID).Delete(&model.Comment{}).Error; err != nil {
 			return err
 		}
 		return tx.Delete(&model.Post{}, postID).Error
 	})
+	if err != nil {
+		return apperror.DatabaseError
+	}
+	return nil
 }
 
 // RecoverPost 恢复被软删除的帖子：把 deleted_at 重新置为 NULL。
 // 必须用 Unscoped() 才能操作到已软删除的记录(否则 GORM 会自动加上“未删除”条件)。
 func (r *PostRepository) RecoverPost(postID uint64) error { 
-	return r.db.Unscoped().Model(&model.Post{}).Where("id = ?", postID).Update("deleted_at", nil).Error
+	if err := r.db.Unscoped().Model(&model.Post{}).Where("id = ?", postID).Update("deleted_at", nil).Error; err != nil {
+		return apperror.DatabaseError
+	}
+	return nil
 }
 
 // GetPosts 分页查询帖子，支持按 type / status 过滤。
@@ -95,10 +105,10 @@ func (r *PostRepository) GetPosts(types []string, statuses []string, limit, offs
 	}
 
 	if err := buildQuery().Count(&total).Error; err != nil {
-		return nil, 0, apperror.ServerError
+		return nil, 0, apperror.DatabaseError
 	}
 	if err := buildQuery().Order("id desc").Limit(limit).Offset(offset).Find(&posts).Error; err != nil {
-		return nil, 0, apperror.ServerError
+		return nil, 0, apperror.DatabaseError
 	}
 	return posts, total, nil
 }
@@ -114,15 +124,18 @@ func (r *PostRepository) GetDeletedPosts(limit, offset int) ([]*model.Post, int6
 	}
 
 	if err := buildQuery().Count(&total).Error; err != nil {
-		return nil, 0, apperror.ServerError
+		return nil, 0, apperror.DatabaseError
 	}
 	if err := buildQuery().Order("id desc").Limit(limit).Offset(offset).Find(&posts).Error; err != nil {
-		return nil, 0, apperror.ServerError
+		return nil, 0, apperror.DatabaseError
 	}
 	return posts, total, nil
 }
 
 // UpdatePostStatus 更新帖子的审核状态(如 pending -> approved / rejected)。
 func (r *PostRepository) UpdatePostStatus(postID uint64, status string) error {
-	return r.db.Model(&model.Post{}).Where("id = ?", postID).Update("status", status).Error
+	if err := r.db.Model(&model.Post{}).Where("id = ?", postID).Update("status", status).Error; err != nil {
+		return apperror.DatabaseError
+	}
+	return nil
 }

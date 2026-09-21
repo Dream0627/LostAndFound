@@ -83,7 +83,7 @@ func (s *PostService) Create(input CreateInput, userID uint64, role string) (*mo
 	}
 
 	if err := s.repository.Create(post); err != nil {
-		return nil, apperror.ServerError
+		return nil, err
 	}
 
 	return post, nil
@@ -155,7 +155,7 @@ func (s *PostService) GetVisiblePost(postID uint64, role string) (*model.Post, e
 		return nil, err
 	}
 	if !isPostAdmin(role) && post.Status != model.PostStatusApproved {
-		return nil, apperror.NotFoundError
+		return nil, apperror.PostNotFoundError
 	}
 	return post, nil
 }

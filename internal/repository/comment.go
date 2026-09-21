@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"LAF/internal/model"
+	"LAF/pkg/apperror"
 )
 
 // ErrCommentNotFound 是本层定义的“哨兵错误”，表示“评论不存在”。
@@ -30,7 +31,10 @@ func NewCommentRepository(db *gorm.DB) *CommentRepository {
 
 // Create 插入一条评论。传入的是指针，GORM 会把自增主键回填到该结构体上。
 func (r *CommentRepository) Create(comment *model.Comment) error {
-	return r.db.Create(comment).Error
+	if err := r.db.Create(comment).Error; err != nil {
+		return apperror.DatabaseError
+	}
+	return nil
 }
 
 // GetCommentByID 按主键查询一条(未删除的)评论。
@@ -42,7 +46,7 @@ func (r *CommentRepository) GetCommentByID(commentID uint64) (*model.Comment, er
 		return nil, ErrCommentNotFound
 	}
 	if err != nil {
-		return nil, err
+		return nil, apperror.DatabaseError
 	}
 	return &comment, nil
 }
@@ -60,10 +64,10 @@ func (r *CommentRepository) GetCommentsByPostID(postID uint64, limit, offset int
 	}
 
 	if err := buildQuery().Count(&total).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, apperror.DatabaseError
 	}
 	if err := buildQuery().Order("id desc").Limit(limit).Offset(offset).Find(&comments).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, apperror.DatabaseError
 	}
 	return comments, total, nil
 }
@@ -71,5 +75,8 @@ func (r *CommentRepository) GetCommentsByPostID(postID uint64, limit, offset int
 // DeleteComment 按主键删除评论。因模型含 gorm.DeletedAt 字段，
 // 这里实际执行的是“软删除”：只更新 deleted_at，数据仍保留在库中。
 func (r *CommentRepository) DeleteComment(commentID uint64) error {
-	return r.db.Delete(&model.Comment{}, commentID).Error
+	if err := r.db.Delete(&model.Comment{}, commentID).Error; err != nil {
+		return apperror.DatabaseError
+	}
+	return nil
 }
