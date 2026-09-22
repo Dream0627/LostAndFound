@@ -25,7 +25,7 @@
 |------|------|----------|
 | `student` | 普通用户 | 只能操作本人的帖子/评论；发帖后状态为 `pending`（待审核）；列表/详情仅能看到 `approved` 帖子 |
 | `postadmin` | 帖子管理员 | 可管理任意帖子/评论；发帖直接 `approved`；可使用全部帖子管理接口 |
-| `mainadmin` | 超级管理员 | 拥有 `postadmin` 的全部权限（角色白名单中二者并列；删除用户等接口目前为预留、未接线） |
+| `mainadmin` | 超级管理员 | 拥有 `postadmin` 的全部权限（角色白名单中二者并列）；并额外拥有账号注销/恢复、申诉审核、待审批列表等接口 |
 
 > 说明：权限采用角色白名单机制，`RequireRole([]string{"postadmin","mainadmin"})` 即表示两类管理员均可访问。
 
@@ -48,6 +48,13 @@
 | 404 | 404 | 用户不存在 | 用户 ID 错误 |
 | 404 | 404 | 评论不存在 | 评论 ID 错误或已软删除 |
 | 409 | 409 | 该学号或工号已存在 | 重复注册（学号/工号已被占用） |
+| 400 | 400 | 无效的申诉原因 | 申诉 reason 非三种合法取值 |
+| 400 | 400 | 无效的申诉状态 | 审核申诉传入非 approved/rejected |
+| 400 | 400 | 该申诉不可审核 | 对非 pending 申诉调用审核 |
+| 400 | 400 | 无效的待审批类型 | 待审批列表 type 非 post/appeal |
+| 404 | 404 | 申诉不存在 | 申诉 ID 错误或已删除 |
+| 409 | 409 | 该用户已处于注销状态 | 重复注销同一账号 |
+| 409 | 409 | 该用户未处于注销状态 | 对未注销账号发起申诉/恢复 |
 | 1000 | 1000 | 系统异常 | 未知服务端错误（HTTP 落 500） |
 | 1001 | 1001 | 数据库操作失败 | 数据库连接/查询/写入异常（HTTP 落 500） |
 
@@ -249,6 +256,73 @@
 
 ---
 
+## 五、账号注销 / 申诉 / 恢复模块
+
+### 1. 注销本人账号
+- **接口**：`DELETE /api/v1/auth/account`
+- **鉴权**：需要
+- **用途**：注销（软删除）本人账号，并**同批软删除本人发布的帖子与评论**（三者同一事务、同一时间戳）。
+- **响应**：`{ "code":0, "msg":"success", "data":{ "user_id": 5 } }`
+- **常见错误**：`409 该用户已处于注销状态`
+
+### 2. 提交申诉（公开）
+- **接口**：`POST /api/v1/appeals`
+- **鉴权**：无需（账号被注销后无法登录，故申诉公开，用 `username` 指明账号）
+- **用途**：对“已注销/被封禁”的账号提出申诉，等待超级管理员审核；`reason` 提供三种类型。
+- **请求体（JSON）**：
+  | 参数 | 类型 | 必传 | 说明 |
+  |------|------|------|------|
+  | `username` | string | 是 | 被注销账号的学号/工号 |
+  | `reason` | string | 是 | `self_regret`(自行注销反悔) / `wrongful_ban`(被管理员误封号请求撤回) / `other`(其他) |
+  | `content` | string | 否 | 申诉说明；`reason=other` 时必填，≤1000 字符 |
+- **响应**：返回创建的申诉对象（`id, user_id, reason, content, status, created_at`）
+- **常见错误**：`400 无效的申诉原因`；`400` 参数非法；`404 用户不存在`；`409 该用户未处于注销状态`
+
+---
+
+## 六、超级管理员模块（/api/v1/admin，仅 mainadmin）
+
+> 以下接口均要求角色为 `mainadmin`。
+
+### 1. 注销用户
+- **接口**：`DELETE /api/v1/admin/users/:user_id`
+- **用途**：注销（软删除）指定用户，并同批软删除其名下帖子与评论。
+- **路径参数**：`user_id`（uint64，必传）
+- **响应**：`{ "code":0, "msg":"success", "data":{ "user_id": 5 } }`
+- **常见错误**：`404 用户不存在`；`409 该用户已处于注销状态`
+
+### 2. 恢复用户
+- **接口**：`PATCH /api/v1/admin/users/:user_id/recover`
+- **用途**：恢复被注销的用户，并**仅恢复与该用户“同批删除（deleted_at 相同）”的帖子与评论**。
+- **路径参数**：`user_id`（uint64，必传）
+- **响应**：`{ "code":0, "msg":"success", "data":{ "user_id": 5 } }`
+- **常见错误**：`404 用户不存在`；`409 该用户未处于注销状态`
+
+### 3. 审核申诉
+- **接口**：`PATCH /api/v1/admin/appeals/:appeal_id/review`
+- **用途**：审核申诉；**审核通过（approved）时自动级联恢复该账号**。
+- **路径参数**：`appeal_id`（uint64，必传）
+- **请求体（JSON）**：
+  | 参数 | 类型 | 必传 | 说明 |
+  |------|------|------|------|
+  | `status` | string | 是 | `approved` 或 `rejected` |
+- **响应**：`{ "code":0, "msg":"success", "data":{ "appeal_id":3, "status":"approved" } }`
+- **常见错误**：`400 无效的申诉状态`；`400 该申诉不可审核`；`404 申诉不存在`
+
+### 4. 待审批列表
+- **接口**：`GET /api/v1/admin/reviews`
+- **用途**：查看“帖子发布”与“注销申诉”的待审批请求；默认返回全部，可按类型筛选。
+- **查询参数**：
+  | 参数 | 类型 | 必传 | 说明 |
+  |------|------|------|------|
+  | `type` | string | 否 | `post`（仅帖子）/ `appeal`（仅申诉）；不传则两类都返回 |
+  | `page` | int | 否 | 默认 1 |
+  | `page_size` | int | 否 | 默认 20，上限 100 |
+- **响应**：`{ "posts":[...], "appeals":[...] }`（按类型过滤时只填充对应数组）
+- **常见错误**：`400 无效的待审批类型`
+
+---
+
 ## 认证与鉴权细节
 
 - **令牌格式**：`Authorization: Bearer <access_token>`（`Bearer` 后必须有一个空格）
@@ -284,8 +358,9 @@
 - **users**：`id, username, name, password_hash, role, created_at, updated_at, deleted_at`
 - **posts**：`id, type, title, content, image_url, is_finished, status(pending/approved/rejected), user_id, created_at, updated_at, deleted_at`；索引 `type`、`status`；外键 `user_id → users(id)`
 - **comments**：`id, post_id, user_id, content, created_at, updated_at, deleted_at`；索引 `post_id`、`user_id`、`created_at DESC`；外键 `post_id → posts(id)`、`user_id → users(id)`（均 `ON DELETE CASCADE`）
+- **appeals**：`id, user_id, reason(self_regret/wrongful_ban/other), content, status(pending/approved/rejected), created_at, updated_at, deleted_at`；索引 `user_id`、`status`；外键 `user_id → users(id)`
 
 ---
 
-**最后更新**：2026-09-18  
+**最后更新**：2026-09-22  
 **本地路径**：`E:\study\LAF`

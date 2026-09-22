@@ -20,17 +20,31 @@ const (
 	PostStatusRejected = "rejected"
 )
 
+// 申诉原因的三种取值。self_regret：自行注销反悔；wrongful_ban：被管理员误封号、请求撤回；other：其他(需自行填写说明)。
+const (
+	AppealReasonSelfRegret  = "self_regret"
+	AppealReasonWrongfulBan = "wrongful_ban"
+	AppealReasonOther       = "other"
+)
+
+// 申诉审核状态的三种取值：pending 待审核、approved 已通过、rejected 已驳回。
+const (
+	AppealStatusPending  = "pending"
+	AppealStatusApproved = "approved"
+	AppealStatusRejected = "rejected"
+)
+
 // User 对应用户表。角色 Role 取值：student(学生)、postadmin(帖子管理员)、mainadmin(超级管理员)。
 // 密码以哈希形式保存(PasswordHash)，绝不明文存储；其 json 标签为 "-"，保证哈希不会返回给前端。
 type User struct {
-	ID           uint64    `gorm:"primaryKey;autoIncrement;comment:用户ID" json:"id"`
-	Username     string    `gorm:"column:username;type:varchar(32);unique;not null,comment:学号或管理员工号" json:"username"`
-	Name         string    `gorm:"column:name;type:varchar(32);not null;size:32" json:"name"`
-	PasswordHash string    `gorm:"column:password_hash;type:varchar(255);not null;comment:密码哈希值" json:"-"` // json:"-" 表示序列化时忽略该字段，避免密码哈希泄露
-	Role         string    `gorm:"column:role;type:enum('student','postadmin','mainadmin');not null;default:'student';comment:角色" json:"role"`
-	CreatedAt    time.Time `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);comment:创建时间" json:"created_at"`
-	UpdatedAt    time.Time `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`
-	DeletedAt  gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at"`
+	ID           uint64         `gorm:"primaryKey;autoIncrement;comment:用户ID" json:"id"`
+	Username     string         `gorm:"column:username;type:varchar(32);unique;not null,comment:学号或管理员工号" json:"username"`
+	Name         string         `gorm:"column:name;type:varchar(32);not null;size:32" json:"name"`
+	PasswordHash string         `gorm:"column:password_hash;type:varchar(255);not null;comment:密码哈希值" json:"-"` // json:"-" 表示序列化时忽略该字段，避免密码哈希泄露
+	Role         string         `gorm:"column:role;type:enum('student','postadmin','mainadmin');not null;default:'student';comment:角色" json:"role"`
+	CreatedAt    time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);comment:创建时间" json:"created_at"`
+	UpdatedAt    time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`
+	DeletedAt    gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at"`
 }
 
 // Post 对应帖子表(失物/招领)。
@@ -57,6 +71,20 @@ type Comment struct {
 	PostID    uint64         `gorm:"column:post_id;not null;index;comment:所属帖子ID" json:"post_id"`
 	UserID    uint64         `gorm:"column:user_id;not null;index;comment:评论作者ID" json:"user_id"`
 	Content   string         `gorm:"column:content;type:varchar(1000);not null;comment:评论内容" json:"content"`
+	CreatedAt time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);comment:创建时间" json:"created_at"`
+	UpdatedAt time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at"`
+}
+
+// Appeal 对应申诉表。用户账号被注销(软删除)后无法登录，因此申诉由被注销者以 username 公开提交；
+// 超级管理员审核通过后，系统会据 UserID 自动恢复该账号。
+// Reason 取值见上方常量；Content 是申诉说明；Status 是审核状态(见上方常量)。
+type Appeal struct {
+	ID        uint64         `gorm:"primaryKey;autoIncrement;comment:申诉ID" json:"id"`
+	UserID    uint64         `gorm:"column:user_id;not null;index;comment:申诉人ID" json:"user_id"`
+	Reason    string         `gorm:"column:reason;type:enum('self_regret','wrongful_ban','other');not null;default:'other';comment:申诉原因" json:"reason"`
+	Content   string         `gorm:"column:content;type:varchar(1000);not null;default:'';comment:申诉说明" json:"content"`
+	Status    string         `gorm:"column:status;type:enum('pending','approved','rejected');not null;default:'pending';index;comment:审核状态" json:"status"`
 	CreatedAt time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);comment:创建时间" json:"created_at"`
 	UpdatedAt time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at"`

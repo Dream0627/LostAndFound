@@ -4,6 +4,7 @@ DROP TABLE IF EXISTS comments;
 
 DROP TABLE IF EXISTS posts;
 
+DROP TABLE IF EXISTS appeals;
 DROP TABLE IF EXISTS users;
 
 CREATE TABLE users (
@@ -60,3 +61,25 @@ CREATE TABLE comments (
         ON UPDATE RESTRICT ON DELETE CASCADE,
     CONSTRAINT chk_comments_content_not_empty CHECK (CHAR_LENGTH(content) BETWEEN 1 AND 1000)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- 申诉表：用户账号被注销(软删除)后无法登录，故由被注销者以 username 公开提交申诉，
+-- 超级管理员审核(pending -> approved/rejected)；审核通过后自动恢复对应账号。
+DROP TABLE IF EXISTS appeals;
+
+CREATE TABLE appeals (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '申诉ID',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '申诉人ID',
+    reason ENUM('self_regret','wrongful_ban','other') NOT NULL DEFAULT 'other' COMMENT '申诉原因: self_regret-自行注销反悔, wrongful_ban-被误封号请求撤回, other-其他',
+    content VARCHAR(1000) NOT NULL DEFAULT '' COMMENT '申诉说明(other 原因必填)',
+    status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending' COMMENT '审核状态',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
+    deleted_at DATETIME(3) DEFAULT NULL COMMENT '软删除时间',
+    PRIMARY KEY (id),
+    KEY idx_appeals_user_id (user_id),
+    KEY idx_appeals_status (status),
+    KEY idx_appeals_created_at (created_at DESC, id DESC),
+    CONSTRAINT fk_appeals_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+        ON UPDATE RESTRICT ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户注销申诉表';

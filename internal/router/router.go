@@ -10,12 +10,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
+	commenthandler "LAF/internal/handler/comment"
 	posthandler "LAF/internal/handler/post"
 	userhandler "LAF/internal/handler/user"
-	commenthandler "LAF/internal/handler/comment"
 
+	appealhandler "LAF/internal/handler/appeal"
+	mainadminhandler "LAF/internal/handler/mainadmin"
 	postadminhandler "LAF/internal/handler/postadmin"
-	//mainadminhandler "LAF/internal/handler/mainadmin"
 	"LAF/internal/middleware"
 	"LAF/internal/repository"
 	"LAF/internal/service"
@@ -24,16 +25,19 @@ import (
 // New 构建并返回配置好的 gin.Engine。参数：数据库句柄、JWT 配置、图片对外基础地址。
 func New(db *gorm.DB, jwtConfig config.JWTConfig, publicBaseURL string) *gin.Engine {
 	engine := gin.Default()
-	engine.Use(middleware.ErrorHandler()) // 注册全局错误处理中间件，统一兜底错误响应
+	engine.Use(middleware.ErrorHandler())  // 注册全局错误处理中间件，统一兜底错误响应
 	engine.Static("/uploads", "./uploads") // 把本地上传目录映射成静态资源，使图片可通过 /uploads/... 直接访问
 
-	userRepository := repository.NewUserRepository(db) // 装配阶段：先建仓库
+	userRepository := repository.NewUserRepository(db)               // 装配阶段：先建仓库
 	userService := service.NewUserService(userRepository, jwtConfig) // 再建服务，注入仓库
 	postRepository := repository.NewPostRepository(db)
 	postService := service.NewPostService(postRepository)
 	postAdminService := service.NewPostAdminService(postRepository)
 	commentRepository := repository.NewCommentRepository(db)
 	commentService := service.NewCommentService(commentRepository, postRepository)
+	appealRepository := repository.NewAppealRepository(db)
+	appealService := service.NewAppealService(appealRepository, userRepository)
+	mainAdminService := service.NewMainAdminService(userRepository, postRepository, appealRepository)
 	//postAdminRepository := repository.NewPostAdminRepository(db)
 	//postAdminService := service.NewPostAdminService(postAdminRepository)
 	//mainAdminRepository := repository.NewMainAdminRepository(db)
@@ -45,23 +49,31 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, publicBaseURL string) *gin.Eng
 	auth.GET("/profile", middleware.Auth(jwtConfig), userhandler.GetProfile(userService))
 	auth.PATCH("/profile", middleware.Auth(jwtConfig), userhandler.UpdateProfile(userService))
 	auth.PATCH("/password", middleware.Auth(jwtConfig), userhandler.UpdatePassword(userService))
+	auth.DELETE("/account", middleware.Auth(jwtConfig), userhandler.DeactivateAccount(userService)) // 注销本人账号(软删除本人及本人内容)
 
 	post := engine.Group("/api/v1/posts") // 帖子相关路由分组
 	post.GET("", middleware.OptionalAuth(jwtConfig), posthandler.ListPosts(postService))
 	post.POST("", middleware.Auth(jwtConfig), posthandler.Create(postService, publicBaseURL))
 	post.GET("/:post_id", middleware.OptionalAuth(jwtConfig), posthandler.GetPost(postService))
-	post.DELETE("/:post_id", middleware.Auth(jwtConfig),posthandler.DeletePost(postService))
-	post.PATCH("/:post_id/recover", middleware.Auth(jwtConfig),posthandler.RecoverPost(postService))
+	post.DELETE("/:post_id", middleware.Auth(jwtConfig), posthandler.DeletePost(postService))
+	post.PATCH("/:post_id/recover", middleware.Auth(jwtConfig), posthandler.RecoverPost(postService))
 	post.PATCH("/:post_id/review", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.ReviewPost(postAdminService)) // 审核帖子：先登录校验，再要求管理员角色
-	post.GET("/:post_id/comments", commenthandler.List(commentService)) // 评论列表仍挂在帖子下(读操作，语义上属于某帖的评论)
+	post.GET("/:post_id/comments", commenthandler.List(commentService))                                                                                                   // 评论列表仍挂在帖子下(读操作，语义上属于某帖的评论)
 
-	comment := engine.Group("/api/v1/comments") // 评论相关路由分组
-	comment.POST("", middleware.Auth(jwtConfig), commenthandler.Create(commentService)) // 发表评论已迁到评论分组(写操作归属评论模块)
+	comment := engine.Group("/api/v1/comments")                                                       // 评论相关路由分组
+	comment.POST("", middleware.Auth(jwtConfig), commenthandler.Create(commentService))               // 发表评论已迁到评论分组(写操作归属评论模块)
 	comment.DELETE("/:comment_id", middleware.Auth(jwtConfig), commenthandler.Delete(commentService)) // 删除评论
+
+	appeal := engine.Group("/api/v1/appeals")            // 申诉相关路由分组
+	appeal.POST("", appealhandler.Create(appealService)) // 提交申诉(公开接口)
 
 	admin := engine.Group("/api/v1/admin") // 管理员路由分组(叠加角色校验)
 	admin.PATCH("/posts/:post_id/status", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.UpdatePostStatus(postAdminService))
 	admin.GET("/posts/deleted", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.ListDeletedPosts(postAdminService))
+	admin.DELETE("/users/:user_id", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.DeleteUser(mainAdminService))
+	admin.PATCH("/users/:user_id/recover", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.RecoverUser(mainAdminService))
+	admin.PATCH("/appeals/:appeal_id/review", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.ReviewAppeal(mainAdminService))
+	admin.GET("/reviews", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.ListReviews(mainAdminService))
 
 	// postadmin := admin.Group("/postadmin")
 

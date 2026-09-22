@@ -37,16 +37,16 @@ type RegisterInput struct {
 
 // LoginResult 是登录成功后的返回：令牌本身、令牌类型、有效期与用户信息。
 type LoginResult struct {
-	AccessToken string `json:"access_token"`
-	TokenType  string `json:"token_type"`
-	ExpiresIn   int64  `json:"expires_in"`
-	User 	    *model.User `json:"user"`
+	AccessToken string      `json:"access_token"`
+	TokenType   string      `json:"token_type"`
+	ExpiresIn   int64       `json:"expires_in"`
+	User        *model.User `json:"user"`
 }
 
 // tokenClaims 是签发的 JWT 载荷：user_id、role 加上标准声明。
 type tokenClaims struct {
-	UserID   uint64  `json:"user_id"`
-	Role     string `json:"role"`
+	UserID uint64 `json:"user_id"`
+	Role   string `json:"role"`
 	jwt.RegisteredClaims
 }
 
@@ -64,6 +64,7 @@ func NewUserService(repository *repository.UserRepository, jwtConfig config.JWTC
 //   - 用户名必须是纯数字；
 //   - 用户名不能重复(先查一次，插入时再兜底捕获唯一键冲突)；
 //   - 密码必须经 bcrypt 哈希后再入库，绝不存明文。
+//
 // 注意：当前“仅允许注册 student 角色”的校验被注释掉了(临时放开)。
 func (s *UserService) Register(input RegisterInput) (*model.User, error) {
 	input.Username = strings.TrimSpace(input.Username)
@@ -71,7 +72,7 @@ func (s *UserService) Register(input RegisterInput) (*model.User, error) {
 	if len(input.Username) == 0 || len(input.Username) > 32 {
 		return nil, apperror.ParamError
 	}
-	if  len(input.Name) == 0 || len(input.Name) > 32 {
+	if len(input.Name) == 0 || len(input.Name) > 32 {
 		return nil, apperror.ParamError
 	}
 	if len(input.Password) < 8 || len(input.Password) > 16 {
@@ -95,10 +96,10 @@ func (s *UserService) Register(input RegisterInput) (*model.User, error) {
 		return nil, err
 	}
 	user := &model.User{
-		Username: input.Username,
-		Name:     input.Name,
+		Username:     input.Username,
+		Name:         input.Name,
 		PasswordHash: string(passwordHash),
-		Role:     input.Role,
+		Role:         input.Role,
 	}
 	if err := s.repository.Create(user); err != nil {
 		if errors.Is(err, repository.ErrUserExists) {
@@ -123,16 +124,16 @@ func (s *UserService) Login(username, password string) (*LoginResult, error) {
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
 		return nil, apperror.LoginError
 	}
-	if s.jwt.Secret == "" || s.jwt.ExpireSeconds <= 0 { 
+	if s.jwt.Secret == "" || s.jwt.ExpireSeconds <= 0 {
 		return nil, errors.New("invalid jwt configuration")
 	}
-	
+
 	now := time.Now()
 	claims := tokenClaims{
 		UserID: user.ID,
 		Role:   user.Role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:  user.Username,
+			Subject:   user.Username,
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(time.Duration(s.jwt.ExpireSeconds) * time.Second)),
 		},
@@ -143,9 +144,9 @@ func (s *UserService) Login(username, password string) (*LoginResult, error) {
 	}
 	return &LoginResult{
 		AccessToken: token,
-		TokenType: "Bearer",
-		ExpiresIn: s.jwt.ExpireSeconds,
-		User: user,
+		TokenType:   "Bearer",
+		ExpiresIn:   s.jwt.ExpireSeconds,
+		User:        user,
 	}, nil
 }
 
@@ -160,7 +161,7 @@ func (s *UserService) GetPostsByUserID(userID uint64) ([]*model.Post, error) {
 
 // GetProfileResult 是个人资料页的返回：用户信息 + 其发布的帖子。
 type GetProfileResult struct {
-	User *model.User `json:"user"`
+	User  *model.User   `json:"user"`
 	Posts []*model.Post `json:"posts"`
 }
 
@@ -188,7 +189,7 @@ func (s *UserService) GetUserByID(userID uint64) (*model.User, error) {
 
 // UpdateProfileInput 是更新资料的入参：只允许改姓名与用户名。
 type UpdateProfileInput struct {
-	Name string `json:"name"`
+	Name     string `json:"name"`
 	Username string `json:"username"`
 }
 
@@ -225,10 +226,10 @@ type UpdatePasswordInput struct {
 }
 
 // UpdatePassword 修改密码。业务规则：
-//   1) 新密码长度需在 8~16；
-//   2) 两次输入的新密码必须一致；
-//   3) 必须校验原密码正确，防止会话被劫持后直接改密；
-//   4) 新密码同样经 bcrypt 哈希后入库。
+//  1. 新密码长度需在 8~16；
+//  2. 两次输入的新密码必须一致；
+//  3. 必须校验原密码正确，防止会话被劫持后直接改密；
+//  4. 新密码同样经 bcrypt 哈希后入库。
 func (s *UserService) UpdatePassword(userID uint64, input UpdatePasswordInput) error {
 	if len(input.NewPassword) < 8 || len(input.NewPassword) > 16 {
 		return apperror.ParamError
@@ -258,4 +259,23 @@ func (s *UserService) UpdatePassword(userID uint64, input UpdatePasswordInput) e
 	return s.repository.UpdateProfile(userID, map[string]interface{}{
 		"password_hash": string(passwordHash),
 	})
+}
+
+// DeactivateAccount 注销本人账号(软删除)。业务规则：
+//  1. 账号必须存在且当前处于正常状态(未注销)，否则返回相应错误；
+//  2. 注销会“同批软删除本人账号及其名下帖子、评论”(详见仓库层 DeactivateUser)。
+//
+// 注销后该账号无法登录；若想恢复，用户需提交申诉，由超级管理员审核通过后级联恢复。
+func (s *UserService) DeactivateAccount(userID uint64) error {
+	user, err := s.repository.GetUserByIDUnscoped(userID)
+	if errors.Is(err, repository.ErrUserNotFound) {
+		return apperror.UserNotFoundError
+	}
+	if err != nil {
+		return err
+	}
+	if user.DeletedAt.Valid {
+		return apperror.UserAlreadyDeactivatedError
+	}
+	return s.repository.DeactivateUser(userID)
 }

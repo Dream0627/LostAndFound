@@ -1,4 +1,4 @@
-// 本文件对应超级管理员“注销用户”接口。
+// 本文件对应超级管理员“恢复用户”接口。
 package mainadmin
 
 import (
@@ -11,8 +11,8 @@ import (
 	"LAF/pkg/response"
 )
 
-// DeleteUser 是“注销用户”的处理器工厂。
-func DeleteUser(mainAdminService *service.MainAdminService) gin.HandlerFunc {
+// RecoverUser 是“恢复用户”的处理器工厂。
+func RecoverUser(mainAdminService *service.MainAdminService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, err := strconv.ParseUint(c.Param("user_id"), 10, 64) // 解析路径中的 user_id
 		if err != nil || userID == 0 {
@@ -20,11 +20,11 @@ func DeleteUser(mainAdminService *service.MainAdminService) gin.HandlerFunc {
 			return
 		}
 
-		if err := mainAdminService.DeleteUser(userID); err != nil {
+		if err := mainAdminService.RecoverUser(userID); err != nil {
 			apperror.AbortWithError(c, err)
 			return
 		}
 
-		response.Success(c, gin.H{"user_id": userID}) // 返回被注销的用户 ID
+		response.Success(c, gin.H{"user_id": userID})
 	}
 }
