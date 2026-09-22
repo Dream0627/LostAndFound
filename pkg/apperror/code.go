@@ -57,4 +57,6 @@ var (
 	InvalidReviewTypeError      = NewError(400, "无效的待审批类型")
 	UserAlreadyDeactivatedError = NewError(409, "该用户已处于注销状态")
 	UserNotDeactivatedError     = NewError(409, "该用户未处于注销状态")
+	GeoLocationNotFoundError    = NewError(404, "定位地点不存在")
+	InvalidCoordinateError      = NewError(400, "无效的坐标")
 )

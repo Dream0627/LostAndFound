@@ -15,6 +15,7 @@ import (
 	userhandler "LAF/internal/handler/user"
 
 	appealhandler "LAF/internal/handler/appeal"
+	geohandler "LAF/internal/handler/geo"
 	mainadminhandler "LAF/internal/handler/mainadmin"
 	postadminhandler "LAF/internal/handler/postadmin"
 	"LAF/internal/middleware"
@@ -38,6 +39,7 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, publicBaseURL string) *gin.Eng
 	appealRepository := repository.NewAppealRepository(db)
 	appealService := service.NewAppealService(appealRepository, userRepository)
 	mainAdminService := service.NewMainAdminService(userRepository, postRepository, appealRepository)
+	geoService := service.NewGeoService() // 地理位置服务(无外部依赖，公开接口)
 	//postAdminRepository := repository.NewPostAdminRepository(db)
 	//postAdminService := service.NewPostAdminService(postAdminRepository)
 	//mainAdminRepository := repository.NewMainAdminRepository(db)
@@ -66,6 +68,10 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, publicBaseURL string) *gin.Eng
 
 	appeal := engine.Group("/api/v1/appeals")            // 申诉相关路由分组
 	appeal.POST("", appealhandler.Create(appealService)) // 提交申诉(公开接口)
+
+	geoGroup := engine.Group("/api/v1/geo")                          // 地理位置路由分组(公开)
+	geoGroup.GET("/locations", geohandler.ListLocations(geoService)) // 校园预设地点列表
+	geoGroup.POST("/locate", geohandler.Locate(geoService))          // 定位/匹配最近地点
 
 	admin := engine.Group("/api/v1/admin") // 管理员路由分组(叠加角色校验)
 	admin.PATCH("/posts/:post_id/status", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.UpdatePostStatus(postAdminService))
