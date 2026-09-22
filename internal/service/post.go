@@ -107,7 +107,8 @@ type PostListResult struct {
 //   - status 过滤：管理员可指定任意合法状态；普通用户被强制只看 approved，
 //     从而保证未审核/被驳回的帖子不会泄漏给普通用户。
 //   - 若最终没有任何状态条件，则默认放开全部状态(主要用于管理员场景)。
-func (s *PostService) GetPosts(types []string, statuses []string, role string, page, pageSize int) (*PostListResult, error) {
+//   - finished 过滤：nil 表示不限；true 只看已完成，false 只看未完成，所有角色均可使用。
+func (s *PostService) GetPosts(types []string, statuses []string, finished *bool, role string, page, pageSize int) (*PostListResult, error) {
 	validTypes := make([]string, 0, len(types)) // 逐个校验 type，剔除/拦截非法值
 	for _, postType := range types {
 		if postType != "lost" && postType != "found" {
@@ -133,7 +134,7 @@ func (s *PostService) GetPosts(types []string, statuses []string, role string, p
 	}
 
 	offset := (page - 1) * pageSize
-	posts, total, err := s.repository.GetPosts(validTypes, validStatuses, pageSize, offset)
+	posts, total, err := s.repository.GetPosts(validTypes, validStatuses, finished, pageSize, offset)
 	if err != nil {
 		return nil, err
 	}

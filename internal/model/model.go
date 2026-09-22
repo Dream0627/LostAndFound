@@ -89,3 +89,48 @@ type Appeal struct {
 	UpdatedAt time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at"`
 }
+
+// 完成寻找申请的三种状态：pending 待处理、agreed 已同意、rejected 已拒绝。
+const (
+	FinishRequestStatusPending  = "pending"
+	FinishRequestStatusAgreed   = "agreed"
+	FinishRequestStatusRejected = "rejected"
+)
+
+// Conversation 对应“申领/召领对话”表。
+// 一条对话由某用户在某个帖子下发起的“申领(found)/召领(lost)”开启，
+// 连接发起方(InitiatorID)与帖子作者(OwnerID，冗余存储便于按人查询)。
+// 同一用户对同一帖子只会有一条对话(应用层幂等保证)。
+type Conversation struct {
+	ID          uint64         `gorm:"primaryKey;autoIncrement;comment:对话ID" json:"id"`
+	PostID      uint64         `gorm:"column:post_id;not null;index;comment:所属帖子ID" json:"post_id"`
+	InitiatorID uint64         `gorm:"column:initiator_id;not null;index;comment:发起方(申领/召领人)ID" json:"initiator_id"`
+	OwnerID     uint64         `gorm:"column:owner_id;not null;index;comment:帖子作者ID" json:"owner_id"`
+	CreatedAt   time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);comment:创建时间" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at"`
+}
+
+// Message 对应对话消息表。
+// ConversationID 关联所属对话，SenderID 是发送者；Content 为消息正文。
+type Message struct {
+	ID             uint64         `gorm:"primaryKey;autoIncrement;comment:消息ID" json:"id"`
+	ConversationID uint64         `gorm:"column:conversation_id;not null;index;comment:所属对话ID" json:"conversation_id"`
+	SenderID       uint64         `gorm:"column:sender_id;not null;index;comment:发送者ID" json:"sender_id"`
+	Content        string         `gorm:"column:content;type:varchar(1000);not null;comment:消息内容" json:"content"`
+	CreatedAt      time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);comment:创建时间" json:"created_at"`
+	UpdatedAt      time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`
+	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at"`
+}
+
+// FinishRequest 对应“完成寻找申请”表。
+// 对话任一方可发起；另一方处理(agreed/rejected)。同意后对应帖子被置为已完成(is_finished=true)。
+type FinishRequest struct {
+	ID             uint64         `gorm:"primaryKey;autoIncrement;comment:完成申请ID" json:"id"`
+	ConversationID uint64         `gorm:"column:conversation_id;not null;index;comment:所属对话ID" json:"conversation_id"`
+	RequesterID    uint64         `gorm:"column:requester_id;not null;index;comment:发起人ID" json:"requester_id"`
+	Status         string         `gorm:"column:status;type:enum('pending','agreed','rejected');not null;default:'pending';index;comment:申请状态" json:"status"`
+	CreatedAt      time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);comment:创建时间" json:"created_at"`
+	UpdatedAt      time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`
+	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at"`
+}

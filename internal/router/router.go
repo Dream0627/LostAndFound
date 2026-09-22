@@ -15,6 +15,7 @@ import (
 	userhandler "LAF/internal/handler/user"
 
 	appealhandler "LAF/internal/handler/appeal"
+	conversationhandler "LAF/internal/handler/conversation"
 	geohandler "LAF/internal/handler/geo"
 	mainadminhandler "LAF/internal/handler/mainadmin"
 	postadminhandler "LAF/internal/handler/postadmin"
@@ -40,6 +41,10 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, publicBaseURL string) *gin.Eng
 	appealService := service.NewAppealService(appealRepository, userRepository)
 	mainAdminService := service.NewMainAdminService(userRepository, postRepository, appealRepository)
 	geoService := service.NewGeoService() // 地理位置服务(无外部依赖，公开接口)
+	conversationRepository := repository.NewConversationRepository(db) // 对话模块：仓库
+	messageRepository := repository.NewMessageRepository(db)
+	finishRequestRepository := repository.NewFinishRequestRepository(db)
+	conversationService := service.NewConversationService(conversationRepository, messageRepository, finishRequestRepository, postRepository) // 对话/完成寻找服务(复用 postRepository)
 	//postAdminRepository := repository.NewPostAdminRepository(db)
 	//postAdminService := service.NewPostAdminService(postAdminRepository)
 	//mainAdminRepository := repository.NewMainAdminRepository(db)
@@ -60,6 +65,7 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, publicBaseURL string) *gin.Eng
 	post.DELETE("/:post_id", middleware.Auth(jwtConfig), posthandler.DeletePost(postService))
 	post.PATCH("/:post_id/recover", middleware.Auth(jwtConfig), posthandler.RecoverPost(postService))
 	post.PATCH("/:post_id/review", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.ReviewPost(postAdminService)) // 审核帖子：先登录校验，再要求管理员角色
+	post.POST("/:post_id/conversations", middleware.Auth(jwtConfig), conversationhandler.Start(conversationService)) // 申领/召领：开启对话(按帖子 type 自动判定)
 	post.GET("/:post_id/comments", commenthandler.List(commentService))                                                                                                   // 评论列表仍挂在帖子下(读操作，语义上属于某帖的评论)
 
 	comment := engine.Group("/api/v1/comments")                                                       // 评论相关路由分组
@@ -72,6 +78,13 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, publicBaseURL string) *gin.Eng
 	geoGroup := engine.Group("/api/v1/geo")                          // 地理位置路由分组(公开)
 	geoGroup.GET("/locations", geohandler.ListLocations(geoService)) // 校园预设地点列表
 	geoGroup.POST("/locate", geohandler.Locate(geoService))          // 定位/匹配最近地点
+
+	conversationGroup := engine.Group("/api/v1/conversations") // 对话相关路由分组(均需登录)
+	conversationGroup.GET("", middleware.Auth(jwtConfig), conversationhandler.List(conversationService)) // 我的对话列表
+	conversationGroup.GET("/:conversation_id/messages", middleware.Auth(jwtConfig), conversationhandler.ListMessages(conversationService)) // 对话消息列表
+	conversationGroup.POST("/:conversation_id/messages", middleware.Auth(jwtConfig), conversationhandler.SendMessage(conversationService)) // 发送消息
+	conversationGroup.POST("/:conversation_id/finish-requests", middleware.Auth(jwtConfig), conversationhandler.Finish(conversationService)) // 发起完成寻找申请
+	conversationGroup.PATCH("/:conversation_id/finish-requests/:request_id", middleware.Auth(jwtConfig), conversationhandler.ReviewFinish(conversationService)) // 处理完成寻找申请
 
 	admin := engine.Group("/api/v1/admin") // 管理员路由分组(叠加角色校验)
 	admin.PATCH("/posts/:post_id/status", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.UpdatePostStatus(postAdminService))

@@ -86,10 +86,11 @@ func (r *PostRepository) RecoverPost(postID uint64) error {
 	return nil
 }
 
-// GetPosts 分页查询帖子，支持按 type / status 过滤。
-// 过滤条件用“仅当有值时才拼接”的方式，实现对空过滤条件的忽略；
-// 同样用闭包复用基础查询，先 Count 求总数，再 Limit/Offset 取当页数据，按 id 倒序(新帖在前)。
-func (r *PostRepository) GetPosts(types []string, statuses []string, limit, offset int) ([]*model.Post, int64, error) {
+// GetPosts 分页查询帖子，支持按 type / status / finished 过滤。
+// 过滤条件用“仅当有值时才拼接”的方式，实现对空过滤条件的忽略；finished 为 nil 表示不限。
+// 同样用闭包复用基础查询，先 Count 求总数，再 Limit/Offset 取当页数据；
+// 排序为“未完成优先(is_finished 升序)，同组内新帖在前(id 倒序)”，使已完成帖子沉到列表末尾。
+func (r *PostRepository) GetPosts(types []string, statuses []string, finished *bool, limit, offset int) ([]*model.Post, int64, error) {
 	var posts []*model.Post
 	var total int64
 
@@ -101,13 +102,16 @@ func (r *PostRepository) GetPosts(types []string, statuses []string, limit, offs
 		if len(statuses) > 0 {
 			query = query.Where("status IN ?", statuses)
 		}
+		if finished != nil {
+			query = query.Where("is_finished = ?", *finished)
+		}
 		return query
 	}
 
 	if err := buildQuery().Count(&total).Error; err != nil {
 		return nil, 0, apperror.DatabaseError
 	}
-	if err := buildQuery().Order("id desc").Limit(limit).Offset(offset).Find(&posts).Error; err != nil {
+	if err := buildQuery().Order("is_finished asc, id desc").Limit(limit).Offset(offset).Find(&posts).Error; err != nil {
 		return nil, 0, apperror.DatabaseError
 	}
 	return posts, total, nil
@@ -135,6 +139,14 @@ func (r *PostRepository) GetDeletedPosts(limit, offset int) ([]*model.Post, int6
 // UpdatePostStatus 更新帖子的审核状态(如 pending -> approved / rejected)。
 func (r *PostRepository) UpdatePostStatus(postID uint64, status string) error {
 	if err := r.db.Model(&model.Post{}).Where("id = ?", postID).Update("status", status).Error; err != nil {
+		return apperror.DatabaseError
+	}
+	return nil
+}
+
+// SetPostFinished 更新帖子的“已完成”标记，供“完成寻找申请”同意后调用。
+func (r *PostRepository) SetPostFinished(postID uint64, finished bool) error {
+	if err := r.db.Model(&model.Post{}).Where("id = ?", postID).Update("is_finished", finished).Error; err != nil {
 		return apperror.DatabaseError
 	}
 	return nil

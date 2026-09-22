@@ -57,6 +57,14 @@
 | 409 | 409 | 该用户未处于注销状态 | 对未注销账号发起申诉/恢复 |
 | 404 | 404 | 定位地点不存在 | 定位接口传入的 location_id 不合法 |
 | 400 | 400 | 无效的坐标 | 定位接口上报的经纬度越界 |
+| 400 | 400 | 不能对自己发布的帖子发起申领/召领 | 对自己帖子调用申领/召领 |
+| 400 | 400 | 无效的完成申请状态 | 处理完成申请时 status 非 agreed/rejected |
+| 400 | 400 | 该完成申请不可处理 | 申请已处理，或已存在待处理申请时重复发起 |
+| 403 | 403 | 无权参与该对话 | 非对话参与方访问/操作该会话 |
+| 404 | 404 | 对话不存在 | 会话 ID 错误或已软删除 |
+| 404 | 404 | 消息不存在 | 消息 ID 错误或已软删除 |
+| 404 | 404 | 完成申请不存在 | 完成申请 ID 错误或不属于该会话 |
+| 409 | 409 | 该帖子已完成 | 对已完成帖子发起申领/召领或完成申请 |
 | 1000 | 1000 | 系统异常 | 未知服务端错误（HTTP 落 500） |
 | 1001 | 1001 | 数据库操作失败 | 数据库连接/查询/写入异常（HTTP 落 500） |
 
@@ -154,11 +162,13 @@
 - **接口**：`GET /api/v1/posts`
 - **鉴权**：可选（带 token 会识别身份，不带则匿名）
 - **用途**：查询帖子列表。**普通用户仅见 `approved`；管理员可见全部并可按状态筛选。**
+- **排序**：**未完成帖子优先，已完成帖子沉到列表末尾**（`is_finished` 升序，同组内 `id` 倒序）。
 - **查询参数**：
   | 参数 | 类型 | 必传 | 说明 |
   |------|------|------|------|
   | `type` | string[] | 否 | 可多选：`?type=lost&type=found` |
   | `status` | string[] | 否 | 可多选：`pending/approved/rejected`；仅管理员有效，普通用户强制 `approved` |
+  | `finished` | string | 否 | 按“是否完成”筛选：`true` 只看已完成、`false` 只看未完成、不传为全部（所有角色均可用） |
   | `page` | int | 否 | 页码，从 1 开始，默认 1 |
   | `page_size` | int | 否 | 每页数量，默认 20，上限 100 |
 - **响应**：`{ list:[...], total, page, page_size }`
@@ -353,6 +363,9 @@
 
 ---
 
+## 八、对话 / 完成寻找模块（/api/v1/conversations）> 场景：失主（`lost` 帖作者）与拾得者（`found` 帖作者）通过“申领 / 召领”建立一对一会话，> 在会话中协商归还，任一方可发起“完成寻找申请”，另一方同意后该帖子置为**已完成**。> **申领（对 `found` 帖）与召领（对 `lost` 帖）共用同一接口**，具体语义由帖子类型自动判定。> 会话消息与完成申请均需登录，且只有对话参与方（发起方 / 楼主）可读写。### 1. 发起申领 / 召领（开启对话）- **接口**：`POST /api/v1/posts/:post_id/conversations`- **鉴权**：需要- **用途**：对某帖子发起对话。帖子为 `found` 即为“申领”，为 `lost` 即为“召领”，由后端按类型自动处理。- **路径参数**：`post_id`（uint64，必传）- **规则**：  - 帖子须**未完成**（`is_finished = false`），否则 `409 该帖子已完成`；  - 不能对自己发布的帖子发起，否则 `400 不能对自己发布的帖子发起申领/召领`；  - 普通用户仅能对 `approved` 帖子发起（否则按帖子不存在处理）；  - **幂等**：同一用户对同一帖子重复发起，直接返回已存在的会话。- **响应**：返回会话对象（`id, post_id, initiator_id, owner_id, created_at`）- **常见错误**：`404 帖子不存在`；`409 该帖子已完成`；`400 不能对自己发布的帖子发起申领/召领`### 2. 我的会话列表（分页）- **接口**：`GET /api/v1/conversations`- **鉴权**：需要- **用途**：查询当前用户作为发起方或楼主参与的全部会话，按 `id` 倒序（新会话在前）。- **查询参数**：`page`（默认 1）、`page_size`（默认 20，上限 100）- **响应**：`{ list:[...], total, page, page_size }`### 3. 会话消息列表（分页）- **接口**：`GET /api/v1/conversations/:conversation_id/messages`- **鉴权**：需要（仅对话参与方）- **用途**：查询某会话内的消息，按 `id` 倒序（新消息在前）。- **路径参数**：`conversation_id`（uint64，必传）- **查询参数**：`page`（默认 1）、`page_size`（默认 20，上限 100）- **响应**：`{ list:[...], total, page, page_size }`- **常见错误**：`404 对话不存在`；`403 无权参与该对话`### 4. 发送消息- **接口**：`POST /api/v1/conversations/:conversation_id/messages`- **鉴权**：需要（仅对话参与方）- **用途**：在当前会话中发送一条消息。- **请求体（JSON）**：  | 参数 | 类型 | 必传 | 说明 |  |------|------|------|------|  | `content` | string | 是 | 消息内容，1–1000 字符 |- **响应**：返回创建的消息对象（`id, conversation_id, sender_id, content, created_at`）- **常见错误**：`400` 参数非法；`404 对话不存在`；`403 无权参与该对话`### 5. 发起完成寻找申请- **接口**：`POST /api/v1/conversations/:conversation_id/finish-requests`- **鉴权**：需要，且为对话参与方（**任一方均可发起**）- **用途**：在会话中发起“完成寻找”申请，等待另一方处理。- **规则**：帖子须未完成；同一会话不得存在**待处理**的申请（重复发起会 `400 该完成申请不可处理`）。- **路径参数**：`conversation_id`（uint64，必传）- **响应**：返回申请对象（`id, conversation_id, requester_id, status, created_at`），新申请 `status = pending`- **常见错误**：`404 对话不存在`；`403 无权参与该对话`；`409 该帖子已完成`；`400 该完成申请不可处理`### 6. 处理完成寻找申请- **接口**：`PATCH /api/v1/conversations/:conversation_id/finish-requests/:request_id`- **鉴权**：需要，且为对话参与方（**须为发起方之外的另一方**）- **用途**：同意或拒绝完成申请。**同意（`agreed`）时，对应帖子置为已完成**（`is_finished = true`）。- **规则**：申请须仍为 `pending`；发起方不能处理自己的申请。- **路径参数**：`conversation_id`、`request_id`（均为 uint64，必传）- **请求体（JSON）**：  | 参数 | 类型 | 必传 | 说明 |  |------|------|------|------|  | `status` | string | 是 | `agreed`（同意）或 `rejected`（拒绝） |- **响应**：`{ \"code\":0, \"msg\":\"success\", \"data\":{ \"id\":3, \"conversation_id\":1, \"requester_id\":2, \"status\":\"agreed\" } }`- **常见错误**：`400 无效的完成申请状态`；`400 该完成申请不可处理`；`403 无权参与该对话`；`404 完成申请不存在`
+---
+
 ## 认证与鉴权细节
 
 - **令牌格式**：`Authorization: Bearer <access_token>`（`Bearer` 后必须有一个空格）
@@ -389,6 +402,9 @@
 - **posts**：`id, type, title, content, image_url, is_finished, status(pending/approved/rejected), user_id, created_at, updated_at, deleted_at`；索引 `type`、`status`；外键 `user_id → users(id)`
 - **comments**：`id, post_id, user_id, content, created_at, updated_at, deleted_at`；索引 `post_id`、`user_id`、`created_at DESC`；外键 `post_id → posts(id)`、`user_id → users(id)`（均 `ON DELETE CASCADE`）
 - **appeals**：`id, user_id, reason(self_regret/wrongful_ban/other), content, status(pending/approved/rejected), created_at, updated_at, deleted_at`；索引 `user_id`、`status`；外键 `user_id → users(id)`
+- **conversations**：`id, post_id, initiator_id, owner_id, created_at, updated_at, deleted_at`；唯一键 `(post_id, initiator_id)`；外键 `post_id → posts(id)`、`initiator_id/owner_id → users(id)`
+- **messages**：`id, conversation_id, sender_id, content, created_at, updated_at, deleted_at`；外键 `conversation_id → conversations(id)`、`sender_id → users(id)`
+- **finish_requests**：`id, conversation_id, requester_id, status(pending/agreed/rejected), created_at, updated_at, deleted_at`；外键 `conversation_id → conversations(id)`、`requester_id → users(id)`
 
 ---
 
