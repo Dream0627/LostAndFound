@@ -32,15 +32,15 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, publicBaseURL string) *gin.Eng
 
 	userRepository := repository.NewUserRepository(db)               // 装配阶段：先建仓库
 	userService := service.NewUserService(userRepository, jwtConfig) // 再建服务，注入仓库
+	geoService := service.NewGeoService() // 地理位置服务(无外部依赖，公开接口)
 	postRepository := repository.NewPostRepository(db)
-	postService := service.NewPostService(postRepository)
+	postService := service.NewPostService(postRepository, geoService) // 注入 geoService：发布帖子时解析地点/坐标
 	postAdminService := service.NewPostAdminService(postRepository)
 	commentRepository := repository.NewCommentRepository(db)
 	commentService := service.NewCommentService(commentRepository, postRepository)
 	appealRepository := repository.NewAppealRepository(db)
 	appealService := service.NewAppealService(appealRepository, userRepository)
 	mainAdminService := service.NewMainAdminService(userRepository, postRepository, appealRepository)
-	geoService := service.NewGeoService() // 地理位置服务(无外部依赖，公开接口)
 	conversationRepository := repository.NewConversationRepository(db) // 对话模块：仓库
 	messageRepository := repository.NewMessageRepository(db)
 	finishRequestRepository := repository.NewFinishRequestRepository(db)

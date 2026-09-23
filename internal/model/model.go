@@ -56,6 +56,9 @@ type Post struct {
 	Type       string         `gorm:"column:type;type:enum('lost','found');not null;default:'lost';comment:帖子类型" json:"type"`
 	Title      string         `gorm:"column:title;type:varchar(2000);not null" json:"title"`
 	ImageURL   *string        `gorm:"column:image_url;type:varchar(1024);default:null;comment:图片URL" json:"image_url"` // 用指针类型表示“可为空”，NULL 与空字符串含义不同
+	LocationID string `gorm:"column:location_id;type:varchar(64);not null;default:'';comment:校园预设地点ID(冗余快照)" json:"location_id"`
+	LocationName string `gorm:"column:location_name;type:varchar(128);not null;default:'';comment:地点名称快照(冗余,减少前端查询)" json:"location_name"`
+	Supplement string `gorm:"column:supplement;type:varchar(200);not null;default:'';comment:地点补充说明" json:"supplement"`
 	Content    string         `gorm:"column:content;type:varchar(2000);not null" json:"content"`
 	IsFinished bool           `gorm:"column:is_finished;type:bool;default:false" json:"is_finished"`
 	Status     string         `gorm:"column:status;type:enum('pending','approved','rejected');not null;default:'pending';index;comment:审核状态" json:"status"`

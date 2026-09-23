@@ -9,6 +9,19 @@
 
 > **📌 本次更新（对话 / 完成寻找功能）**>> 后端新增了“申领 / 召领 → 对话 → 完成寻找”一条链路，前端需新增对接（帖子列表筛选也在本次调整）：>> | 类型 | 变化 | 对接要点 |> |---|---|---|> | 新增接口 | `POST /api/v1/posts/:post_id/conversations` | **申领 / 召领合一**：对 `found` 帖发起即“申领”、对 `lost` 帖发起即“召领”，后端按帖子类型自动判定，前端无需区分 |> | 新增接口 | `GET /api/v1/conversations` | “我的会话”列表（发起方 / 楼主均可见），分页 |> | 新增接口 | `GET /api/v1/conversations/:conversation_id/messages` | 会话消息列表（分页，仅参与方） |> | 新增接口 | `POST /api/v1/conversations/:conversation_id/messages` | 发送消息：body `{ content }` |> | 新增接口 | `POST /api/v1/conversations/:conversation_id/finish-requests` | 发起“完成寻找”申请（对话任一方） |> | 新增接口 | `PATCH /api/v1/conversations/:conversation_id/finish-requests/:request_id` | 另一方同意 / 拒绝：body `{ status: "agreed"｜"rejected" }`；**同意后帖子变为已完成** |> | 帖子列表 | `GET /api/v1/posts` 新增 `finished` 查询参数 | `finished=true` 只看已完成、`false` 只看未完成、不传为全部（**所有用户可用**，建议与 `type` 筛选项并列） |> | 排序变化 | 帖子列表 | **未完成优先，已完成沉到列表末尾**（后端已处理，前端一般无需改动） |> | 新增错误码 | `403 无权参与该对话`、`404 对话不存在`、`409 该帖子已完成` 等 | 见下文 F 节 |
 
+> **📌 本次更新（帖子位置参数）**
+>
+> 发布帖子（`POST /posts`，multipart）**新增可选位置字段**，用于就近推荐：
+>
+> | 字段 | 类型 | 说明 |
+> |---|---|---|
+> | `location_id` | string | 手动选择的校园预设地点 ID（与坐标二选一） |
+> | `latitude` | float | 自动定位纬度（WGS-84，与 `longitude` 成对） |
+> | `longitude` | float | 自动定位经度（WGS-84） |
+> | `supplement` | string | 地点补充说明，≤200 字符 |
+>
+> 后端会把地点解析为可读地名并**冗余存入帖子**，列表/详情直接返回 `location_id` / `location_name` / `supplement`，**前端无需再查一次地点接口**。可直接复用第一部分的 `LocationPicker.vue` 拿到 `location_id`，或拿 `latitude`/`longitude` 交给后端自动匹配。
+
 
 ---
 
@@ -154,7 +167,7 @@ frontend-geo-demo/
 | 接口 | 方法 | 鉴权 | 对接思路 |
 |---|---|---|---|
 | `/posts` | GET | 可选 | 首页/列表：`type`(`lost`/`found` 可多选)、`status`(仅管理员)、`finished`(`true`已完成/`false`未完成/不传全部，所有用户可用)、`page`/`page_size`；返回分页信封。**未完成帖子排在前面** |
-| `/posts` | POST | 需登录 | 发布：**multipart/form-data**（`type`/`title`/`content`/可选 `image`）。学生发帖为 `pending`，管理员直接 `approved` |
+| `/posts` | POST | 需登录 | 发布：**multipart/form-data**（`type`/`title`/`content`/可选 `image`/可选位置 `location_id` 或 `latitude`+`longitude` + `supplement`）。学生发帖为 `pending`，管理员直接 `approved` |
 | `/posts/:post_id` | GET | 可选 | 详情页；普通用户仅能看 `approved`，否则 404 |
 | `/posts/:post_id` | DELETE | 需登录 | 删除本人帖子（管理员可删任意）；会级联软删该帖评论 |
 | `/posts/:post_id/recover` | PATCH | 需登录 | 恢复被删帖子 |
@@ -169,6 +182,10 @@ fd.append("type", "lost");
 fd.append("title", "遗失一张校园卡");
 fd.append("content", "……");
 if (imageFile) fd.append("image", imageFile);
+// 可选位置：手动选的 location_id，或自动定位的 latitude/longitude（二选一）
+if (locationId) fd.append("location_id", locationId);
+if (coords) { fd.append("latitude", coords.latitude); fd.append("longitude", coords.longitude); }
+if (supplement) fd.append("supplement", supplement);
 await http.post("/posts", fd);
 ```
 

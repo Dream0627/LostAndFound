@@ -32,3 +32,16 @@ func Parse(pageValue, pageSizeValue string) (int, int) {
 
 	return page, pageSize
 }
+
+// Offset 把对外的 page/page_size 换算成数据库查询所需的偏移量：offset = (page-1)*pageSize。
+// 集中成一个函数可避免各列表服务各写一遍同样的算式、口径不一。
+// page 小于 1 时按第 1 页处理(page/page_size 已由 Parse 归一，这里再兜底一次)。
+func Offset(page, pageSize int) int {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		return 0
+	}
+	return (page - 1) * pageSize
+}

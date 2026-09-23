@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -79,13 +80,27 @@ func Create(postService *service.PostService, publicBaseURL string) gin.HandlerF
 			}
 		}
 
+		// 可选位置信息：location_id(手动选择)与 latitude/longitude(自动匹配)二选一，supplement 为补充说明。
+		locationID := c.PostForm("location_id")
+		supplement := c.PostForm("supplement")
+		latitude, longitude, hasCoords, coordErr := parseOptionalCoords(c.PostForm("latitude"), c.PostForm("longitude"))
+		if coordErr != nil {
+			apperror.AbortWithException(c, apperror.ParamError, coordErr)
+			return
+		}
+
 		nowUserID, _ := middleware.CurrentUserID(c)
 		nowUserRole, _ := middleware.CurrentRole(c)
 		createdPost, err := postService.Create(service.CreateInput{ // 调用业务层创建帖子(作者取登录身份，状态由业务层按角色决定)
-			Type:     postType,
-			Title:    title,
-			Content:  content,
-			ImageURL: imageURL,
+			Type:       postType,
+			Title:      title,
+			Content:    content,
+			ImageURL:   imageURL,
+			LocationID: locationID,
+			Latitude:   latitude,
+			Longitude:  longitude,
+			HasCoords:  hasCoords,
+			Supplement: supplement,
 		}, nowUserID, nowUserRole)
 
 		if err != nil {
@@ -95,4 +110,27 @@ func Create(postService *service.PostService, publicBaseURL string) gin.HandlerF
 
 		response.Success(c, createdPost) // 返回创建好的帖子
 	}
+}
+
+// parseOptionalCoords 解析可选的坐标字段(latitude/longitude)。
+// 约束：两者要么都不传(返回 hasCoords=false，表示未上报坐标)，要么都传且都是合法数字；
+// 只传其一或解析失败都视为参数错误，避免“半个坐标”被静默忽略。
+func parseOptionalCoords(latitudeRaw, longitudeRaw string) (float64, float64, bool, error) {
+	latStr := strings.TrimSpace(latitudeRaw)
+	lonStr := strings.TrimSpace(longitudeRaw)
+	if latStr == "" && lonStr == "" {
+		return 0, 0, false, nil
+	}
+	if latStr == "" || lonStr == "" {
+		return 0, 0, false, apperror.ParamError
+	}
+	latitude, err := strconv.ParseFloat(latStr, 64)
+	if err != nil {
+		return 0, 0, false, apperror.ParamError
+	}
+	longitude, err := strconv.ParseFloat(lonStr, 64)
+	if err != nil {
+		return 0, 0, false, apperror.ParamError
+	}
+	return latitude, longitude, true, nil
 }

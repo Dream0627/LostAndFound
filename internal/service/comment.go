@@ -11,6 +11,7 @@ import (
 	"LAF/internal/model"
 	"LAF/internal/repository"
 	"LAF/pkg/apperror"
+	"LAF/pkg/pagination"
 )
 
 // CommentService 依赖两个仓库：
@@ -80,17 +81,13 @@ func (s *CommentService) GetCommentByID(commentID uint64) (*model.Comment, error
 }
 
 // CommentListResult 是评论列表的返回结构(list + 分页信息)，直接序列化给前端。
-type CommentListResult struct {
-	List     []*model.Comment `json:"list"`
-	Total    int64            `json:"total"`
-	Page     int              `json:"page"`
-	PageSize int              `json:"page_size"`
-}
+// CommentListResult 是评论列表的返回结构，复用通用分页结构 PageResult。
+type CommentListResult = PageResult[*model.Comment]
 
 // GetCommentsByPostID 分页查询某帖子的评论。
 // 把对外的 page/page_size 换算成数据库需要的 limit/offset：offset = (page-1)*pageSize。
 func (s *CommentService) GetCommentsByPostID(postID uint64, page, pageSize int) (*CommentListResult, error) {
-	offset := (page - 1) * pageSize
+	offset := pagination.Offset(page, pageSize)
 	comments, total, err := s.repository.GetCommentsByPostID(postID, pageSize, offset)
 	if err != nil {
 		return nil, err

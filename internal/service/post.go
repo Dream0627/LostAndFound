@@ -10,16 +10,18 @@ import (
 	"LAF/internal/model"
 	"LAF/internal/repository"
 	"LAF/pkg/apperror"
+	"LAF/pkg/pagination"
 )
 
 // PostService 只依赖帖子仓库(评论相关的联动删除在仓库层事务里完成)。
-type PostService struct { 
+type PostService struct {
 	repository *repository.PostRepository
+	geoService *GeoService // 发布帖子时用于把“地点ID/坐标”解析成可读地点(可选位置信息)
 }
 
-// NewPostService 由 router 注入帖子仓库。
-func NewPostService(repository *repository.PostRepository) *PostService { 
-	return &PostService{repository: repository}
+// NewPostService 由 router 注入帖子仓库与地理位置服务。
+func NewPostService(repository *repository.PostRepository, geoService *GeoService) *PostService {
+	return &PostService{repository: repository, geoService: geoService}
 }
 
 // GetPostByID 直连仓库查询未删除帖子，供删除/恢复前做权限判断使用。
@@ -47,10 +49,17 @@ func (s *PostService) CheckpostPermission(userID uint64, role string, post *mode
 
 // CreateInput 是“发布帖子”的业务入参 DTO。ImageURL 用指针表示“可选(可为空)”。
 type CreateInput struct {
-    Type     string
-    Title    string
-    Content  string
-    ImageURL *string
+	Type     string
+	Title    string
+	Content  string
+	ImageURL *string
+	// 位置为可选信息：LocationID(手动选择预设地点)或 Latitude/Longitude(自动匹配)二选一，
+	// HasCoords 用于区分“未上报坐标”与“(0,0)”；Supplement 是选择地点后的补充说明。
+	LocationID string
+	Latitude   float64
+	Longitude  float64
+	HasCoords  bool
+	Supplement string
 }
 
 // Create 发布帖子。核心业务规则：
@@ -67,19 +76,41 @@ func (s *PostService) Create(input CreateInput, userID uint64, role string) (*mo
 		return nil, apperror.ParamError
 	}
 
+	// 位置可选：仅当前端提供了地点ID或坐标时才解析，并把地名“冗余快照”进帖子，
+	// 便于列表/详情直接展示地名，减少前端再查一次地点接口的成本。
+	var locationID, locationName, supplement string
+	if strings.TrimSpace(input.LocationID) != "" || input.HasCoords {
+		locateResult, err := s.geoService.Locate(LocateInput{
+			LocationID: input.LocationID,
+			Latitude:   input.Latitude,
+			Longitude:  input.Longitude,
+			Supplement: input.Supplement,
+			HasCoords:  input.HasCoords,
+		})
+		if err != nil {
+			return nil, err
+		}
+		locationID = locateResult.Location.ID
+		locationName = locateResult.Location.Name
+		supplement = locateResult.Supplement
+	}
+
 	status := model.PostStatusPending // 默认待审核；管理员另外处理
 	if isPostAdmin(role) {
 		status = model.PostStatusApproved
 	}
 
 	post := &model.Post{
-		Type:       input.Type,
-		Title:      input.Title,
-		ImageURL:   input.ImageURL,
-		Content:    input.Content,
-		IsFinished: false,
-		Status:     status,
-		UserID:     userID,
+		Type:         input.Type,
+		Title:        input.Title,
+		ImageURL:     input.ImageURL,
+		LocationID:   locationID,
+		LocationName: locationName,
+		Supplement:   supplement,
+		Content:      input.Content,
+		IsFinished:   false,
+		Status:       status,
+		UserID:       userID,
 	}
 
 	if err := s.repository.Create(post); err != nil {
@@ -94,13 +125,8 @@ func isPostAdmin(role string) bool {
 	return role == "postadmin" || role == "mainadmin"
 }
 
-// PostListResult 是帖子列表的返回结构(list + 分页信息)。
-type PostListResult struct {
-	List     []*model.Post `json:"list"`
-	Total    int64         `json:"total"`
-	Page     int           `json:"page"`
-	PageSize int           `json:"page_size"`
-}
+// PostListResult 是帖子列表的返回结构，复用通用分页结构 PageResult。
+type PostListResult = PageResult[*model.Post]
 
 // GetPosts 分页查询帖子，并在业务层做“可见性/过滤”控制：
 //   - type 过滤：只接受 lost / found，非法值报参数错误；
@@ -120,7 +146,7 @@ func (s *PostService) GetPosts(types []string, statuses []string, finished *bool
 	validStatuses := make([]string, 0, len(statuses)) // 按角色决定可见的状态集合
 	if isPostAdmin(role) {
 		for _, status := range statuses {
-			if status != model.PostStatusPending && status != model.PostStatusApproved && status != model.PostStatusRejected {
+			if !IsValidPostStatus(status) { // 复用统一的状态合法性校验
 				return nil, apperror.InvalidPostStatusError
 			}
 			validStatuses = append(validStatuses, status)
@@ -133,7 +159,7 @@ func (s *PostService) GetPosts(types []string, statuses []string, finished *bool
 		validStatuses = append(validStatuses, model.PostStatusPending, model.PostStatusApproved, model.PostStatusRejected)
 	}
 
-	offset := (page - 1) * pageSize
+	offset := pagination.Offset(page, pageSize)
 	posts, total, err := s.repository.GetPosts(validTypes, validStatuses, finished, pageSize, offset)
 	if err != nil {
 		return nil, err
@@ -155,8 +181,8 @@ func (s *PostService) GetVisiblePost(postID uint64, role string) (*model.Post, e
 	if err != nil {
 		return nil, err
 	}
-	if !isPostAdmin(role) && post.Status != model.PostStatusApproved {
-		return nil, apperror.PostNotFoundError
+	if err := ensurePostVisible(post, role); err != nil {
+		return nil, err
 	}
 	return post, nil
 }
@@ -169,4 +195,14 @@ func (s *PostService) DeletePost(postID uint64) error {
 // RecoverPost 委托仓库恢复被软删除的帖子。
 func (s *PostService) RecoverPost(postID uint64) error { 
 	return s.repository.RecoverPost(postID)
+}
+
+// ensurePostVisible 统一“帖子对当前用户是否可见”的判定。
+// 规则：管理员(postadmin/mainadmin)可见任意状态；普通用户仅可见 approved。
+// 不可见时一律返回“帖子不存在”，避免暴露“该 id 上其实有个未审核帖子”的信息。
+func ensurePostVisible(post *model.Post, role string) error {
+	if isPostAdmin(role) || post.Status == model.PostStatusApproved {
+		return nil
+	}
+	return apperror.PostNotFoundError
 }

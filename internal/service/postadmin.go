@@ -5,6 +5,7 @@ import (
 	"LAF/internal/model"
 	"LAF/internal/repository"
 	"LAF/pkg/apperror"
+	"LAF/pkg/pagination"
 )
 
 // PostAdminService 复用帖子仓库来读写帖子状态。
@@ -59,7 +60,7 @@ func (s *PostAdminService) UpdatePostStatus(postID uint64, status string) error 
 
 // GetDeletedPosts 分页查询已删除帖子(回收站)，同样把 page/page_size 换算成 limit/offset。
 func (s *PostAdminService) GetDeletedPosts(page, pageSize int) (*PostListResult, error) {
-	offset := (page - 1) * pageSize
+	offset := pagination.Offset(page, pageSize)
 	posts, total, err := s.repository.GetDeletedPosts(pageSize, offset)
 	if err != nil {
 		return nil, err

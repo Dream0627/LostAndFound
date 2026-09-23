@@ -156,7 +156,12 @@
   | `title` | string | 是 | 标题 |
   | `content` | string | 是 | 内容，1–2000 字符 |
   | `image` | file | 否 | 图片，保存至 `./uploads/posts/`，返回公网 URL |
-- **响应**：返回帖子对象（含 `id, type, title, content, image_url, status, is_finished, user_id, created_at`）
+  | `location_id` | string | 否 | 手动选择的校园预设地点 ID（如 `pf-jiahe-east-3`） |
+  | `latitude` | float | 否 | 自动定位纬度（WGS-84）；与 `longitude` 须成对出现 |
+  | `longitude` | float | 否 | 自动定位经度（WGS-84）；与 `latitude` 须成对出现 |
+  | `supplement` | string | 否 | 地点补充说明，≤200 字符 |
+- **位置（可选）**：`location_id`（手动选择）与 `latitude`+`longitude`（自动定位）**二选一**；只传其一视为参数错误。后端将地点解析为可读地名并**冗余快照**存进帖子，列表/详情可直接展示，无需前端再查一次地点接口。
+- **响应**：返回帖子对象（含 `id, type, title, content, image_url, location_id, location_name, supplement, status, is_finished, user_id, created_at`）
 
 ### 2. 帖子列表（筛选 + 分页）
 - **接口**：`GET /api/v1/posts`
@@ -399,7 +404,7 @@
 ## 附录：数据库表结构（摘要）
 
 - **users**：`id, username, name, password_hash, role, created_at, updated_at, deleted_at`
-- **posts**：`id, type, title, content, image_url, is_finished, status(pending/approved/rejected), user_id, created_at, updated_at, deleted_at`；索引 `type`、`status`；外键 `user_id → users(id)`
+- **posts**：`id, type, title, content, image_url, location_id, location_name, supplement, is_finished, status(pending/approved/rejected), user_id, created_at, updated_at, deleted_at`；索引 `type`、`status`；外键 `user_id → users(id)`（`location_name`/`supplement` 为发布时写入的地点冗余快照）
 - **comments**：`id, post_id, user_id, content, created_at, updated_at, deleted_at`；索引 `post_id`、`user_id`、`created_at DESC`；外键 `post_id → posts(id)`、`user_id → users(id)`（均 `ON DELETE CASCADE`）
 - **appeals**：`id, user_id, reason(self_regret/wrongful_ban/other), content, status(pending/approved/rejected), created_at, updated_at, deleted_at`；索引 `user_id`、`status`；外键 `user_id → users(id)`
 - **conversations**：`id, post_id, initiator_id, owner_id, created_at, updated_at, deleted_at`；唯一键 `(post_id, initiator_id)`；外键 `post_id → posts(id)`、`initiator_id/owner_id → users(id)`
@@ -408,5 +413,5 @@
 
 ---
 
-**最后更新**：2026-09-22  
+**最后更新**：2026-09-23  
 **本地路径**：`E:\study\LAF`

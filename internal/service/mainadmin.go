@@ -7,6 +7,7 @@ import (
 	"LAF/internal/model"
 	"LAF/internal/repository"
 	"LAF/pkg/apperror"
+	"LAF/pkg/pagination"
 )
 
 // 待审批列表支持的“请求类型”。post 表示帖子发布待审核，appeal 表示注销申诉待审核。
@@ -119,7 +120,7 @@ func (s *MainAdminService) GetPendingReviews(reviewType string, page, pageSize i
 		return nil, apperror.InvalidReviewTypeError
 	}
 
-	offset := (page - 1) * pageSize
+	offset := pagination.Offset(page, pageSize)
 	result := &PendingReviewResult{
 		Posts:   make([]*model.Post, 0),
 		Appeals: make([]*model.Appeal, 0),

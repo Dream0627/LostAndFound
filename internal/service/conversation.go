@@ -9,6 +9,7 @@ import (
 	"LAF/internal/model"
 	"LAF/internal/repository"
 	"LAF/pkg/apperror"
+	"LAF/pkg/pagination"
 )
 
 // ConversationService 依赖对话/消息/完成申请三个仓库，以及帖子仓库(用于校验帖子与置为已完成)。
@@ -45,8 +46,8 @@ func (s *ConversationService) StartConversation(postID, userID uint64, role stri
 	if err != nil {
 		return nil, err
 	}
-	if !isPostAdmin(role) && post.Status != model.PostStatusApproved {
-		return nil, apperror.PostNotFoundError
+	if err := ensurePostVisible(post, role); err != nil {
+		return nil, err
 	}
 	if post.IsFinished {
 		return nil, apperror.PostAlreadyFinishedError
@@ -75,16 +76,12 @@ func (s *ConversationService) StartConversation(postID, userID uint64, role stri
 }
 
 // ConversationListResult 是对话列表的返回结构(list + 分页信息)。
-type ConversationListResult struct {
-	List     []*model.Conversation `json:"list"`
-	Total    int64                 `json:"total"`
-	Page     int                   `json:"page"`
-	PageSize int                   `json:"page_size"`
-}
+// ConversationListResult 是对话列表的返回结构，复用通用分页结构 PageResult。
+type ConversationListResult = PageResult[*model.Conversation]
 
 // GetMyConversations 分页查询当前用户参与(发起或收到)的对话。
 func (s *ConversationService) GetMyConversations(userID uint64, page, pageSize int) (*ConversationListResult, error) {
-	offset := (page - 1) * pageSize
+	offset := pagination.Offset(page, pageSize)
 	conversations, total, err := s.conversationRepository.ListConversationsByUser(userID, pageSize, offset)
 	if err != nil {
 		return nil, err
@@ -101,12 +98,8 @@ func (s *ConversationService) checkParticipant(conversation *model.Conversation,
 }
 
 // MessageListResult 是消息列表的返回结构(list + 分页信息)。
-type MessageListResult struct {
-	List     []*model.Message `json:"list"`
-	Total    int64            `json:"total"`
-	Page     int              `json:"page"`
-	PageSize int              `json:"page_size"`
-}
+// MessageListResult 是消息列表的返回结构，复用通用分页结构 PageResult。
+type MessageListResult = PageResult[*model.Message]
 
 // GetMessages 分页查询某对话的消息(仅参与方可读)。
 func (s *ConversationService) GetMessages(conversationID, userID uint64, page, pageSize int) (*MessageListResult, error) {
@@ -118,7 +111,7 @@ func (s *ConversationService) GetMessages(conversationID, userID uint64, page, p
 		return nil, err
 	}
 
-	offset := (page - 1) * pageSize
+	offset := pagination.Offset(page, pageSize)
 	messages, total, err := s.messageRepository.ListMessagesByConversation(conversationID, pageSize, offset)
 	if err != nil {
 		return nil, err
