@@ -1,0 +1,50 @@
+# LAF 一键单机部署：一个 MySQL + 一个后端应用。
+# 使用前：把 config/config.yaml 里的 database.host 改成 mysql（即下面的服务名）。
+# 启动：docker compose up -d --build
+# 停止：docker compose down        （加 -v 会连同数据卷一起删除）
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: laf-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_DATABASE: laf_db
+      MYSQL_USER: laf
+      MYSQL_PASSWORD: laf123456
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # 首次启动（数据卷为空）时自动执行建表脚本。
+      - ./migrations/tables.sql:/docker-entrypoint-initdb.d/01_tables.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot123456"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: laf-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      # 用宿主机配置覆盖镜像内路径，config.yaml 不打进镜像；其中 database.host 需填 mysql。
+      - ./config/config.yaml:/app/config/config.yaml:ro
+      # 上传的帖子图片持久化，重建容器不丢。
+      - uploads:/app/uploads
+
+volumes:
+  mysql_data:
+  uploads:

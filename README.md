@@ -1,6 +1,8 @@
 # LAF 失物招领后端 API 文档
 
 校园失物招领平台的 Go 后端，技术栈 **Go + Gin + GORM(MySQL) + Viper + JWT + bcrypt**。
+声明：本仓库中前端框架基于 [gin-vue-admin](https://github.com/flipped-aurora/gin-vue-admin)，感谢作者开源。
+     前端内容由ai自动生成，以供前端开发参考
 
 - Base URL：`http://localhost:8080`
 - 统一响应信封：`{ "code": <业务码>, "msg": "<说明>", "data": <数据> }`
@@ -16,6 +18,36 @@
 3. **启动**：`go run main.go`（默认端口 8080）。
 4. **注册**：调用「注册」接口创建账号。
 5. **登录**：调用「登录」接口拿到 `access_token`，后续鉴权接口在请求头携带该 token。
+
+### 使用 Docker 部署（可选）
+
+本后端为无状态服务，外部只依赖 MySQL，已提供容器化文件：
+
+- `Dockerfile`：多阶段构建（`golang:1.26.5-alpine` 编译 → `alpine` 运行），`CGO_ENABLED=0` 静态编译，最终镜像仅含二进制与运行期资源。
+- `docker-compose.yml`：一键拉起 `mysql` + `app`，含健康检查、数据卷与首次建表挂载。
+- `.dockerignore`：排除 `.git`、`frontend-demo`、真实配置与 `uploads`，缩小构建上下文。
+
+**步骤**：
+1. 编辑 `config/config.yaml`，把 `database.host` 改成 `mysql`（compose 里的服务名），其余按需调整。
+2. 构建并启动：
+   ```bash
+   docker compose up -d --build
+   ```
+3. 访问 `http://localhost:8080`；MySQL 首次启动会自动执行 `migrations/tables.sql` 建表。
+4. 停止：`docker compose down`（加 `-v` 会连同数据卷一起删除）。
+
+**说明**：
+- 真实的 `config/config.yaml` **不会打进镜像**（由 compose 以只读挂载注入），避免密钥入库；镜像内只保留 `config.example.yaml` 作模板。
+- 帖子图片目录 `uploads/` 用命名卷持久化，重建容器不丢；`engine.Static` 仍通过 `/uploads/...` 对外提供。
+- 若自行 `docker build` 单镜像运行，需在启动时把配置与 `uploads` 目录挂载进容器：
+  ```bash
+  docker build -t laf-backend .
+  docker run -d -p 8080:8080 \
+    -v "$PWD/config/config.yaml:/app/config/config.yaml:ro" \
+    -v "$PWD/uploads:/app/uploads" \
+    --name laf-backend laf-backend
+  ```
+- 数据库若用宿主机或云 MySQL，只需把 `database.host/port/username/password/name` 填好即可，无需 compose 里的 `mysql` 服务。
 
 ---
 
