@@ -63,3 +63,11 @@ func (r *FinishRequestRepository) UpdateStatus(requestID uint64, status string) 
 	}
 	return nil
 }
+
+// Delete 软删除一条完成申请(发起方撤回自己的待处理申请时调用)，只置 deleted_at，不物理删除。
+func (r *FinishRequestRepository) Delete(requestID uint64) error {
+	if err := r.db.Delete(&model.FinishRequest{}, requestID).Error; err != nil {
+		return apperror.DatabaseError
+	}
+	return nil
+}

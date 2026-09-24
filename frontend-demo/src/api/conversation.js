@@ -28,3 +28,13 @@ export function handleFinishRequest(conversationId, requestId, status) {
     { status }
   );
 }
+
+// 查询会话当前待处理的“完成寻找”申请（仅参与方）。无申请时返回 null。
+export function getPendingFinishRequest(conversationId) {
+  return http.get(`/conversations/${conversationId}/finish-requests`);
+}
+
+// 撤回自己发起的“完成寻找”申请（仅发起方）。
+export function withdrawFinishRequest(conversationId, requestId) {
+  return http.delete(`/conversations/${conversationId}/finish-requests/${requestId}`);
+}

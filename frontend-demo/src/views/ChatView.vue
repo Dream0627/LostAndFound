@@ -25,8 +25,8 @@
       <div v-if="pendingRequest" class="finish-banner mt-8">
         <template v-if="pendingRequest.requester_id === auth.user?.id">
           <span>你已发起完成寻找申请，等待对方处理…</span>
-          <button class="btn btn-danger btn-sm" :disabled="finishLoading" @click="handleHandle('rejected')">
-            撤回（拒绝）
+          <button class="btn btn-danger btn-sm" :disabled="finishLoading" @click="handleWithdraw">
+            撤回申请
           </button>
         </template>
         <template v-else>
@@ -81,6 +81,8 @@ import {
   sendMessage,
   createFinishRequest,
   handleFinishRequest,
+  getPendingFinishRequest,
+  withdrawFinishRequest,
 } from "@/api/conversation";
 import { useAuthStore } from "@/stores/auth";
 import { useToastStore } from "@/stores/toast";
@@ -171,7 +173,32 @@ async function handleHandle(status) {
   }
 }
 
-onMounted(() => fetchMessages(true));
+async function fetchPendingRequest() {
+  try {
+    pendingRequest.value = await getPendingFinishRequest(conversationId);
+  } catch (e) {
+    pendingRequest.value = null;
+  }
+}
+
+async function handleWithdraw() {
+  if (!pendingRequest.value) return;
+  finishLoading.value = true;
+  try {
+    await withdrawFinishRequest(conversationId, pendingRequest.value.id);
+    toast.success("已撤回申请");
+    pendingRequest.value = null;
+  } catch (e) {
+    toast.error(e?.msg || "撤回失败");
+  } finally {
+    finishLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  fetchMessages(true);
+  fetchPendingRequest();
+});
 </script>
 
 <style scoped>

@@ -224,3 +224,43 @@ func (s *ConversationService) ReviewFinishRequest(conversationID, requestID, use
 	}
 	return request, nil
 }
+
+// GetPendingFinishRequest 查询某对话当前待处理的完成申请(仅参与方可见)。
+// 不存在待处理申请时返回 (nil, nil)，供前端进入会话时判断是否显示申请横幅。
+func (s *ConversationService) GetPendingFinishRequest(conversationID, userID uint64) (*model.FinishRequest, error) {
+	conversation, err := s.conversationRepository.GetConversationByID(conversationID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.checkParticipant(conversation, userID); err != nil {
+		return nil, err
+	}
+	return s.finishRequestRepository.GetPendingFinishRequestByConversation(conversationID)
+}
+
+// WithdrawFinishRequest 由申请发起方撤回自己发起的“完成寻找”申请。
+// 规则：只有发起方能撤回；申请必须仍为 pending；撤回后申请被软删除，帖子不受影响。
+func (s *ConversationService) WithdrawFinishRequest(conversationID, requestID, userID uint64) error {
+	conversation, err := s.conversationRepository.GetConversationByID(conversationID)
+	if err != nil {
+		return err
+	}
+	if err := s.checkParticipant(conversation, userID); err != nil {
+		return err
+	}
+
+	request, err := s.finishRequestRepository.GetFinishRequestByID(requestID)
+	if err != nil {
+		return err
+	}
+	if request.ConversationID != conversationID {
+		return apperror.FinishRequestNotFoundError
+	}
+	if request.Status != model.FinishRequestStatusPending {
+		return apperror.FinishRequestNotPendingError
+	}
+	if request.RequesterID != userID {
+		return apperror.UserForbiddenError // 只有发起方能撤回自己的申请
+	}
+	return s.finishRequestRepository.Delete(requestID)
+}

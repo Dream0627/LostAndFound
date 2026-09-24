@@ -85,6 +85,8 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, publicBaseURL string) *gin.Eng
 	conversationGroup.POST("/:conversation_id/messages", middleware.Auth(jwtConfig), conversationhandler.SendMessage(conversationService)) // 发送消息
 	conversationGroup.POST("/:conversation_id/finish-requests", middleware.Auth(jwtConfig), conversationhandler.Finish(conversationService)) // 发起完成寻找申请
 	conversationGroup.PATCH("/:conversation_id/finish-requests/:request_id", middleware.Auth(jwtConfig), conversationhandler.ReviewFinish(conversationService)) // 处理完成寻找申请
+	conversationGroup.GET("/:conversation_id/finish-requests", middleware.Auth(jwtConfig), conversationhandler.GetPendingFinish(conversationService)) // 查询待处理的完成寻找申请
+	conversationGroup.DELETE("/:conversation_id/finish-requests/:request_id", middleware.Auth(jwtConfig), conversationhandler.WithdrawFinish(conversationService)) // 发起方撤回完成寻找申请
 
 	admin := engine.Group("/api/v1/admin") // 管理员路由分组(叠加角色校验)
 	admin.PATCH("/posts/:post_id/status", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.UpdatePostStatus(postAdminService))
