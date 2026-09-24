@@ -1,0 +1,7 @@
+# 构建上下文裁剪：排除本地依赖与产物，减小上下文、加速构建。
+node_modules
+dist
+.vite
+.env
+.env.local
+.env.*.local

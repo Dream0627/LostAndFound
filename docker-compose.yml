@@ -1,7 +1,12 @@
-# LAF 一键单机部署：一个 MySQL + 一个后端应用。
-# 使用前：把 config/config.yaml 里的 database.host 改成 mysql（即下面的服务名）。
-# 启动：docker compose up -d --build
+# LAF 前后端分离部署编排：MySQL + 后端 API + 前端(Nginx)。
+# 使用前：
+#   1) 把 config/config.docker.yaml 的 server.public_base_url 改成 http://<服务器IP>:8080；
+#   2) JWT secret 改成随机串。
+# 在线构建：docker compose up -d --build
+# 离线部署(服务器无外网)：先在有网机器执行 offline/build-and-save.sh 导出镜像，
+#   上传后在服务器执行 offline/load-and-run.sh（见 OFFLINE_DEPLOY.md）
 # 停止：docker compose down        （加 -v 会连同数据卷一起删除）
+# 访问：http://<服务器IP>:8080 （前端站点；/api、/uploads 由 Nginx 同源反代到后端，后端不单独对外暴露端口）
 services:
   mysql:
     image: mysql:8.0
@@ -16,8 +21,6 @@ services:
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
-    ports:
-      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       # 首次启动（数据卷为空）时自动执行建表脚本。
@@ -28,22 +31,41 @@ services:
       timeout: 5s
       retries: 30
 
-  app:
+  backend:
+    image: laf-backend:latest
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: laf-app
+    container_name: laf-backend
     restart: unless-stopped
     depends_on:
       mysql:
         condition: service_healthy
-    ports:
-      - "8080:8080"
+    environment:
+      TZ: Asia/Shanghai
+    # 单端口部署：后端不映射到宿主机，仅容器内网 8080 可达，由前端 Nginx 同源反代访问。
+    expose:
+      - "8080"
     volumes:
-      # 用宿主机配置覆盖镜像内路径，config.yaml 不打进镜像；其中 database.host 需填 mysql。
-      - ./config/config.yaml:/app/config/config.yaml:ro
+      # 用宿主机配置覆盖镜像内路径；其中 database.host 已填 mysql。
+      - ./config/config.docker.yaml:/app/config/config.yaml:ro
       # 上传的帖子图片持久化，重建容器不丢。
       - uploads:/app/uploads
+
+  frontend:
+    image: laf-frontend:latest
+    build:
+      context: ./frontend-demo
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+    container_name: laf-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    # 前端站点为对外入口，映射到宿主机 8080。
+    ports:
+      - "8080:80"
 
 volumes:
   mysql_data:
