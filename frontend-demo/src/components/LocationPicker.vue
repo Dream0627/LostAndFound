@@ -80,6 +80,21 @@ onMounted(async () => {
   }
 });
 
+// 把浏览器 Geolocation 的错误码翻译成可操作的提示，避免“一律显示未授权”误导用户。
+// code 约定：1=PERMISSION_DENIED（用户/系统拒绝），2=POSITION_UNAVAILABLE（定位源不可用，如系统定位未开或网络定位不可达），3=TIMEOUT（超时）。
+function geoErrorMessage(err) {
+  switch (err && err.code) {
+    case 1:
+      return "定位权限被拒绝：请在浏览器地址栏左侧把本站“位置”权限改为“允许”，并确认系统定位服务已开启";
+    case 2:
+      return "无法获取位置：请检查系统定位服务是否开启，或当前网络/环境不支持定位（可改用手动选择地点）";
+    case 3:
+      return "定位超时：请重试，或改用手动选择地点";
+    default:
+      return "定位失败，请手动选择地点";
+  }
+}
+
 // 一键自动定位：拿浏览器经纬度交给后端匹配最近地点；失败则引导手动选择。
 function handleGeolocate() {
   errorMsg.value = "";
@@ -103,11 +118,11 @@ function handleGeolocate() {
         locating.value = false;
       }
     },
-    () => {
+    (err) => {
       locating.value = false;
-      errorMsg.value = "未获取到定位授权，请手动选择地点";
+      errorMsg.value = geoErrorMessage(err);
     },
-    { enableHighAccuracy: true, timeout: 8000 }
+    { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
   );
 }
 
