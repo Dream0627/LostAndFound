@@ -1,12 +1,13 @@
 # LAF 前后端分离部署编排：MySQL + 后端 API + 前端(Nginx)。
 # 使用前：
-#   1) 把 config/config.docker.yaml 的 server.public_base_url 改成 http://<服务器IP>:8080；
-#   2) JWT secret 改成随机串。
+#   1) 把 config/config.docker.yaml 的 jwt.secret 改成随机串(图片已改用相对路径，无需再配 public_base_url)。
+#   2) 前后端分端口部署时，把前端来源(如 http://公网IP:5173)填进 config/config.docker.yaml 的
+#      server.cors_allow_origins，否则浏览器会拦截跨域请求。
 # 在线构建：docker compose up -d --build
-# 离线部署(服务器无外网)：先在有网机器执行 offline/build-and-save.sh 导出镜像，
-#   上传后在服务器执行 offline/load-and-run.sh（见 OFFLINE_DEPLOY.md）
 # 停止：docker compose down        （加 -v 会连同数据卷一起删除）
-# 访问：http://<服务器IP>:8080 （前端站点；/api、/uploads 由 Nginx 同源反代到后端，后端不单独对外暴露端口）
+# 端口规划：
+#   8080 -> 后端 API（直接对外，供 5173 前端跨域调用；/uploads 图片也在此端口）
+#   9090 -> 临时前端 frontend-demo（容器内 Nginx 同源反代后端，之后由正式前端替换）
 services:
   mysql:
     image: mysql:8.0
@@ -43,9 +44,10 @@ services:
         condition: service_healthy
     environment:
       TZ: Asia/Shanghai
-    # 单端口部署：后端不映射到宿主机，仅容器内网 8080 可达，由前端 Nginx 同源反代访问。
-    expose:
-      - "8080"
+    # 前后端分离：后端直接映射到宿主机 8080 对外提供 API 与 /uploads 图片，
+    # 供 5173 端口的正式前端跨域调用（须在 config 的 cors_allow_origins 中放行前端来源）。
+    ports:
+      - "8080:8080"
     volumes:
       # 用宿主机配置覆盖镜像内路径；其中 database.host 已填 mysql。
       - ./config/config.docker.yaml:/app/config/config.yaml:ro
@@ -63,9 +65,10 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-    # 前端站点为对外入口，映射到宿主机 8080。
+    # 临时前端站点映射到宿主机 9090（8080 已让给后端 API）；
+    # 容器内 Nginx 仍将 /api、/uploads 同源反代到 backend，跨域与端口无关。
     ports:
-      - "8080:80"
+      - "9090:80"
 
 volumes:
   mysql_data:

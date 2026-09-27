@@ -13,10 +13,11 @@ import (
 // 每个字段同时带 form 与 json 标签：允许用表单或 JSON 提交，灵活性更高。
 // binding:"required" 表示这些字段都必传。
 type RegisterRequest struct {
-	Username string `form:"username" json:"username" binding:"required"`
-	Name	 string `form:"name" json:"name" binding:"required"`
-	Password string `form:"password" json:"password" binding:"required"`
-	Role     string `form:"role" json:"role" binding:"required"`
+	Username    string `form:"username" json:"username" binding:"required"`
+	Name        string `form:"name" json:"name" binding:"required"`
+	Password    string `form:"password" json:"password" binding:"required"`
+	Role        string `form:"role" json:"role" binding:"required"`
+	AdminSecret string `form:"admin_secret,omitempty" json:"admin_secret,omitempty"` // 仅注册管理员时需要
 }
 
 // Register 是“注册”的处理器工厂。
@@ -29,10 +30,11 @@ func Register(userService *service.UserService) gin.HandlerFunc {
 		}
 
 		createdUser, err := userService.Register(service.RegisterInput{ // 把请求体转成业务入参并调用业务层
-			Username: request.Username,
-			Name:     request.Name,
-			Password: request.Password,
-			Role:     request.Role,
+			Username:    request.Username,
+			Name:        request.Name,
+			Password:    request.Password,
+			Role:        request.Role,
+			AdminSecret: request.AdminSecret,
 		})
 		if err != nil {
 			apperror.AbortWithError(c, err)

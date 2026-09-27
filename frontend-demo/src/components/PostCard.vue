@@ -13,9 +13,10 @@
     <h3 class="pc-title">{{ post.title }}</h3>
     <p class="pc-content">{{ excerpt }}</p>
 
-    <img v-if="post.image_url" :src="post.image_url" class="pc-image" alt="帖子图片" />
+    <img v-if="post.image_url" :src="imageSrc" class="pc-image" alt="帖子图片" />
 
     <div class="pc-meta">
+      <span class="pc-author">👤 {{ post.author_name || ('用户 ' + post.user_id) }}</span>
       <span v-if="post.location_name" class="pc-loc">📍 {{ post.location_name }}</span>
       <span class="pc-time muted">{{ formatTime(post.created_at) }}</span>
     </div>
@@ -25,11 +26,14 @@
 <script setup>
 import { computed } from "vue";
 import StatusBadge from "./StatusBadge.vue";
+import { resolveImageUrl } from "@/utils/image";
 
 const props = defineProps({
   post: { type: Object, required: true },
   showStatus: { type: Boolean, default: false },
 });
+
+const imageSrc = computed(() => resolveImageUrl(props.post.image_url));
 
 const excerpt = computed(() => {
   const text = props.post.content || "";
@@ -93,5 +97,8 @@ function formatTime(value) {
 }
 .pc-loc {
   color: var(--color-primary-dark);
+}
+.pc-author {
+  color: var(--color-text-muted);
 }
 </style>

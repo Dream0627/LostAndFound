@@ -10,10 +10,15 @@ import (
 	"github.com/spf13/viper"
 )
 
-// ServerConfig 对应 YAML 的 server 段：监听端口，以及对外可访问的基础 URL(用于拼接图片地址)。
+// ServerConfig 对应 YAML 的 server 段：监听端口与跨域白名单。
 type ServerConfig struct {
-	Port          int    `mapstructure:"port"`
-	PublicBaseURL string `mapstructure:"public_base_url"`
+	Port int `mapstructure:"port"`
+	// CORSAllowOrigins 是允许跨域访问后端的前端来源列表。
+	// 前后端分离部署(如前端在 5173)时填写，如 "http://公网IP:5173"；
+	// 同源部署(前端 Nginx 反代)时留空即可。
+	CORSAllowOrigins []string `mapstructure:"cors_allow_origins"`
+	// AdminSecret 是注册管理员(postadmin/mainadmin)时需要出示的暗号；为空则禁止注册管理员。
+	AdminSecret string `mapstructure:"admin_secret"`
 }
 
 // DatabaseConfig 对应 database 段：MySQL 连接信息；Enabled 为 false 时程序将不连接数据库。

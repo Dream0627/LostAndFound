@@ -15,8 +15,7 @@
 ### 步骤
 1. 托盘右键 Docker 图标 → **Settings**（设置）
 2. 左侧选 **Docker Engine**（Docker 引擎）
-3. 右侧是 JSON 配置。**保留原有其他字段**，加入 `registry-mirrors`，可参考项目里的
-   `offline/daemon.json`（本项目已生成，直接用它的内容）：
+3. 右侧是 JSON 配置。**保留原有其他字段**，加入 `registry-mirrors`：
 ```json
 {
   "registry-mirrors": [
@@ -29,7 +28,7 @@
 }
 ```
 4. 点 **Apply & Restart**，等 Docker 引擎完全重启（托盘图标变绿/稳定）。
-5. 重新双击 `offline\build-and-save.bat`。
+5. 重新执行 `docker compose up -d --build`。
 
 ### 另一种等价做法（直接改配置文件）
 截图里 `docker --help` 显示配置目录是 `C:\Users\Administrator\.docker`。
@@ -60,7 +59,6 @@ docker pull node:20-alpine
 docker pull nginx:1.27-alpine
 docker pull alpine:3.20
 docker compose build
-docker save -o dist-offline\laf-images.tar laf-backend:latest laf-frontend:latest mysql:8.0
 ```
 配好加速器后，这些 pull 应能很快看到 `Downloading / Extracting / Pull complete`。
 

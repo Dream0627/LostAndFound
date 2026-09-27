@@ -21,26 +21,9 @@ import (
 	"LAF/pkg/response"
 )
 
-// 构建图片URL(绝对路径,去除前后可能存在的斜杠"/")
-// buildPublicImageURL 拼接图片的对外可访问 URL(基础地址 + 相对路径)。
-// 用 TrimRight/TrimLeft 去掉两端多余的斜杠，避免拼出 "//" 或漏掉 "/"。
-// 对空值做了兜底：基础地址为空就只返回相对路径，相对路径为空就只返回基础地址。
-func buildPublicImageURL(publicBaseURL, relativePath string) string {
-	base := strings.TrimRight(publicBaseURL, "/")
-	path := strings.TrimLeft(relativePath, "/")
-	if base == "" {
-		return path
-	}
-	if path == "" {
-		return base
-	}
-	return fmt.Sprintf("%s/%s", base, path)
-}
-
-
 // Create 是“发布帖子”的处理器工厂。
-// 它需要 postService 与 publicBaseURL(用于给图片拼绝对地址)，因此在注册路由时一并注入。
-func Create(postService *service.PostService, publicBaseURL string) gin.HandlerFunc {
+// 图片只存相对路径(如 /uploads/posts/xxx.png)，因此不需要注入对外基础地址。
+func Create(postService *service.PostService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		postType := c.PostForm("type") // 从 multipart 表单读取普通字段(注意不是 JSON)
 		title := c.PostForm("title")
@@ -75,7 +58,7 @@ func Create(postService *service.PostService, publicBaseURL string) gin.HandlerF
 					apperror.AbortWithException(c, apperror.ServerError, err)
 					return
 				}
-				url := buildPublicImageURL(publicBaseURL, relativePath) // 记录图片的对外访问地址，存入帖子
+				url := "/" + relativePath // 只存相对路径(如 /uploads/posts/xxx.png)，由前端同源访问；避免写死主机，换 IP/域名后图片仍可访问
 				imageURL = &url
 			}
 		}

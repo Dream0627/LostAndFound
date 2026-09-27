@@ -1,6 +1,10 @@
 server:
   port: YourPort
-  public_base_url: "http://localhost:YourPort"
+  cors_allow_origins:
+    - "http://localhost:5173"
+    - "http://localhost:9090"
+  # 注册管理员时需要出示的暗号；生产环境请改成复杂值。
+  admin_secret: "YourAdminSecret"
 
 database:
   enabled: true

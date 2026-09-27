@@ -35,6 +35,7 @@ func (r *PostRepository) GetPostByID(postID uint64) (*model.Post, error) {
 		}
 		return nil, apperror.DatabaseError
 	}
+	r.fillPostAuthorNames([]*model.Post{&post}) // 回填作者姓名(展示用，非表字段)
 	return &post, nil
 }
 
@@ -50,6 +51,7 @@ func (r *PostRepository) GetPostByIDUnscoped(postID uint64) (*model.Post, error)
 		}
 		return nil, apperror.DatabaseError
 	}
+	r.fillPostAuthorNames([]*model.Post{&post}) // 回填作者姓名(展示用，非表字段)
 	return &post, nil
 }
 
@@ -114,6 +116,7 @@ func (r *PostRepository) GetPosts(types []string, statuses []string, finished *b
 	if err := buildQuery().Order("is_finished asc, id desc").Limit(limit).Offset(offset).Find(&posts).Error; err != nil {
 		return nil, 0, apperror.DatabaseError
 	}
+	r.fillPostAuthorNames(posts) // 回填作者姓名(展示用，非表字段)
 	return posts, total, nil
 }
 
@@ -133,6 +136,7 @@ func (r *PostRepository) GetDeletedPosts(limit, offset int) ([]*model.Post, int6
 	if err := buildQuery().Order("id desc").Limit(limit).Offset(offset).Find(&posts).Error; err != nil {
 		return nil, 0, apperror.DatabaseError
 	}
+	r.fillPostAuthorNames(posts) // 回填作者姓名(展示用，非表字段)
 	return posts, total, nil
 }
 

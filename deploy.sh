@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # ============================================================================
-# LAF 前后端分离 · 单端口(8080) 一键部署脚本
+# LAF 前后端分离 · 一键部署脚本
+# 端口规划：8080=后端 API（直接对外），9090=临时前端 frontend-demo。
 # 用法：把项目上传到服务器后，在项目根目录执行：  bash deploy.sh
-# 作用：内存/swap 自检 -> Docker 自检(可自动安装) -> 注入 public_base_url ->
+# 作用：内存/swap 自检 -> Docker 自检(可自动安装) ->
 #       生成 JWT secret -> 构建启动 -> 健康检查
 # 非交互：ASSUME_YES=1 bash deploy.sh
 # 注意：需在 Linux 运行，使用 LF 换行（从 Windows 拷贝时勿被转成 CRLF）。
@@ -10,7 +11,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-HTTP_PORT="${HTTP_PORT:-8080}"
+BACKEND_PORT="${BACKEND_PORT:-8080}"
+FRONTEND_PORT="${FRONTEND_PORT:-9090}"
 COMPOSE_FILE="docker-compose.yml"
 CFG="config/config.docker.yaml"
 ASSUME_YES="${ASSUME_YES:-0}"
@@ -66,20 +68,15 @@ PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-}"
 if [ -z "$PUBLIC_BASE_URL" ]; then
   IP="$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)"
   [ -z "$IP" ] && IP="127.0.0.1"
-  PUBLIC_BASE_URL="http://${IP}:${HTTP_PORT}"
-  log "未指定 PUBLIC_BASE_URL，自动推断为 ${PUBLIC_BASE_URL}（可 export PUBLIC_BASE_URL=... 覆盖）"
+  PUBLIC_BASE_URL="http://${IP}"
+  log "未指定 PUBLIC_BASE_URL，自动推断为 ${PUBLIC_BASE_URL}（可 export PUBLIC_BASE_URL=... 覆盖，不要带端口）"
 fi
 case "$PUBLIC_BASE_URL" in
   *127.0.0.1*|*localhost*) warn "当前对外地址是本地回环，若服务器未绑定公网IP，外部将无法访问。" ;;
 esac
 
-# ---- 3. 写入 public_base_url ---------------------------------------------
-if grep -q "public_base_url" "$CFG"; then
-  sed -i.bak -E "s#(public_base_url:[[:space:]]*).*#\1\"${PUBLIC_BASE_URL}\"#" "$CFG"
-  log "已写入 server.public_base_url = ${PUBLIC_BASE_URL}"
-fi
 
-# ---- 4. 生成 JWT secret（仍为占位符时）-----------------------------------
+# ---- 3. 生成 JWT secret（仍为占位符时）-----------------------------------
 if grep -q "CHANGE_ME_WITH_RANDOM_SECRET" "$CFG"; then
   SECRET="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
   sed -i.bak -E "s#(secret:[[:space:]]*).*#\1\"${SECRET}\"#" "$CFG"
@@ -87,22 +84,34 @@ if grep -q "CHANGE_ME_WITH_RANDOM_SECRET" "$CFG"; then
 fi
 rm -f "$CFG".bak
 
-# ---- 5. 构建并启动 --------------------------------------------------------
+# ---- 4. 构建并启动 --------------------------------------------------------
 log "开始构建并启动容器（首次较慢，请耐心等待）..."
 $DC -f "$COMPOSE_FILE" up -d --build
 
-# ---- 6. 健康检查 ----------------------------------------------------------
-log "等待前端站点就绪..."
+# ---- 5. 健康检查 ----------------------------------------------------------
+log "等待后端 API 就绪..."
 OK=0
 for i in $(seq 1 60); do
-  code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "http://127.0.0.1:${HTTP_PORT}/" || true)"
-  if [ "$code" = "200" ] || [ "$code" = "304" ]; then
-    log "前端已就绪：${PUBLIC_BASE_URL}/  （HTTP ${code}）"; OK=1; break
+  code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "http://127.0.0.1:${BACKEND_PORT}/api/v1/geo/locations" || true)"
+  if [ "$code" = "200" ]; then
+    log "后端已就绪：${PUBLIC_BASE_URL}:${BACKEND_PORT}  （HTTP ${code}）"; OK=1; break
   fi
   sleep 2
 done
-[ "$OK" = "1" ] || err "前端未在预期时间内就绪，请查看： $DC logs -f frontend"
+[ "$OK" = "1" ] || err "后端未在预期时间内就绪，请查看： $DC logs -f backend"
+
+log "等待临时前端站点就绪..."
+OK=0
+for i in $(seq 1 30); do
+  code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "http://127.0.0.1:${FRONTEND_PORT}/" || true)"
+  if [ "$code" = "200" ] || [ "$code" = "304" ]; then
+    log "临时前端已就绪：${PUBLIC_BASE_URL}:${FRONTEND_PORT}/  （HTTP ${code}）"; OK=1; break
+  fi
+  sleep 2
+done
+[ "$OK" = "1" ] || err "临时前端未在预期时间内就绪，请查看： $DC logs -f frontend"
 
 log "容器状态："
 $DC -f "$COMPOSE_FILE" ps
-log "完成。对外访问： ${PUBLIC_BASE_URL}"
+log "完成。后端 API: ${PUBLIC_BASE_URL}:${BACKEND_PORT}  临时前端: ${PUBLIC_BASE_URL}:${FRONTEND_PORT}"
+log "提醒：若启用 5173 正式前端，请把 ${PUBLIC_BASE_URL}:5173 加入 ${CFG} 的 server.cors_allow_origins 并重启后端。"

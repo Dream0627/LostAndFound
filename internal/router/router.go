@@ -24,14 +24,15 @@ import (
 	"LAF/internal/service"
 )
 
-// New 构建并返回配置好的 gin.Engine。参数：数据库句柄、JWT 配置、图片对外基础地址。
-func New(db *gorm.DB, jwtConfig config.JWTConfig, publicBaseURL string) *gin.Engine {
+// New 构建并返回配置好的 gin.Engine。参数：数据库句柄、JWT 配置、CORS 允许来源、管理员暗号。
+func New(db *gorm.DB, jwtConfig config.JWTConfig, corsAllowOrigins []string, adminSecret string) *gin.Engine {
 	engine := gin.Default()
-	engine.Use(middleware.ErrorHandler())  // 注册全局错误处理中间件，统一兜底错误响应
-	engine.Static("/uploads", "./uploads") // 把本地上传目录映射成静态资源，使图片可通过 /uploads/... 直接访问
+	engine.Use(middleware.CORS(corsAllowOrigins)) // 跨域中间件注册在最外层，保证错误响应也带跨域头
+	engine.Use(middleware.ErrorHandler())         // 注册全局错误处理中间件，统一兜底错误响应
+	engine.Static("/uploads", "./uploads")        // 把本地上传目录映射成静态资源，使图片可通过 /uploads/... 直接访问
 
-	userRepository := repository.NewUserRepository(db)               // 装配阶段：先建仓库
-	userService := service.NewUserService(userRepository, jwtConfig) // 再建服务，注入仓库
+	userRepository := repository.NewUserRepository(db)                              // 装配阶段：先建仓库
+	userService := service.NewUserService(userRepository, jwtConfig, adminSecret)   // 再建服务，注入仓库与暗号
 	geoService := service.NewGeoService() // 地理位置服务(无外部依赖，公开接口)
 	postRepository := repository.NewPostRepository(db)
 	postService := service.NewPostService(postRepository, geoService) // 注入 geoService：发布帖子时解析地点/坐标
@@ -60,7 +61,7 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, publicBaseURL string) *gin.Eng
 
 	post := engine.Group("/api/v1/posts") // 帖子相关路由分组
 	post.GET("", middleware.OptionalAuth(jwtConfig), posthandler.ListPosts(postService))
-	post.POST("", middleware.Auth(jwtConfig), posthandler.Create(postService, publicBaseURL))
+	post.POST("", middleware.Auth(jwtConfig), posthandler.Create(postService))
 	post.GET("/:post_id", middleware.OptionalAuth(jwtConfig), posthandler.GetPost(postService))
 	post.DELETE("/:post_id", middleware.Auth(jwtConfig), posthandler.DeletePost(postService))
 	post.PATCH("/:post_id/recover", middleware.Auth(jwtConfig), posthandler.RecoverPost(postService))

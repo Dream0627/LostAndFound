@@ -69,6 +69,7 @@ func (r *CommentRepository) GetCommentsByPostID(postID uint64, limit, offset int
 	if err := buildQuery().Order("id desc").Limit(limit).Offset(offset).Find(&comments).Error; err != nil {
 		return nil, 0, apperror.DatabaseError
 	}
+	r.fillCommentAuthorNames(comments) // 回填作者姓名(展示用，非表字段)
 	return comments, total, nil
 }
 

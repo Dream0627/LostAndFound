@@ -19,7 +19,7 @@
                 <span class="review-title">{{ p.title }}</span>
               </div>
               <p class="muted text-sm">
-                帖子 #{{ p.id }} · 作者 ID：{{ p.user_id }} · {{ formatTime(p.created_at) }}
+                帖子 #{{ p.id }} · 作者：{{ p.author_name || ('用户 ' + p.user_id) }} · {{ formatTime(p.created_at) }}
               </p>
             </div>
             <button class="btn btn-sm" @click="handleRecover(p.id)">恢复</button>

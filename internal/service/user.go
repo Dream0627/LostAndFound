@@ -21,18 +21,20 @@ import (
 // 预编译一次可避免每次注册都重新编译，提升效率。
 var numericUsername = regexp.MustCompile(`^[0-9]+$`)
 
-// UserService 依赖用户仓库和 JWT 配置(登录时要用密钥与有效期签发令牌)。
+// UserService 依赖用户仓库、JWT 配置(登录时签发令牌)与管理员暗号(注册管理员时校验)。
 type UserService struct {
-	repository *repository.UserRepository
-	jwt        config.JWTConfig
+	repository  *repository.UserRepository
+	jwt         config.JWTConfig
+	adminSecret string
 }
 
 // RegisterInput 是注册的业务入参 DTO。
 type RegisterInput struct {
-	Username string
-	Name     string
-	Password string
-	Role     string
+	Username    string
+	Name        string
+	Password    string
+	Role        string
+	AdminSecret string // 仅注册管理员(postadmin/mainadmin)时需要出示的暗号
 }
 
 // LoginResult 是登录成功后的返回：令牌本身、令牌类型、有效期与用户信息。
@@ -50,11 +52,12 @@ type tokenClaims struct {
 	jwt.RegisteredClaims
 }
 
-// NewUserService 由 router 注入用户仓库与 JWT 配置。
-func NewUserService(repository *repository.UserRepository, jwtConfig config.JWTConfig) *UserService {
+// NewUserService 由 router 注入用户仓库、JWT 配置与管理员暗号。
+func NewUserService(repository *repository.UserRepository, jwtConfig config.JWTConfig, adminSecret string) *UserService {
 	return &UserService{
-		repository: repository,
-		jwt:        jwtConfig,
+		repository:  repository,
+		jwt:         jwtConfig,
+		adminSecret: adminSecret,
 	}
 }
 
@@ -84,6 +87,13 @@ func (s *UserService) Register(input RegisterInput) (*model.User, error) {
 	// if input.Role != "student" {
 	// 	return nil, apperror.ParamError
 	// }
+
+	// 注册管理员需要暗号校验。
+	if input.Role == "postadmin" || input.Role == "mainadmin" {
+		if s.adminSecret == "" || input.AdminSecret != s.adminSecret {
+			return nil, apperror.AdminSecretError
+		}
+	}
 
 	if _, err := s.repository.FindByUsername(input.Username); err == nil {
 		return nil, apperror.UserRepeatError

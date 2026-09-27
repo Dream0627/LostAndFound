@@ -53,6 +53,7 @@ type User struct {
 type Post struct {
 	ID         uint64         `gorm:"primaryKey;autoIncrement;comment:帖子ID" json:"id"`
 	UserID     uint64         `gorm:"column:user_id;not null;index;comment:作者ID" json:"user_id"`
+	AuthorName string         `gorm:"-" json:"author_name"` // 作者姓名：非表字段(gorm:"-")，查询后按 user_id 关联用户表回填，仅用于返回给前端
 	Type       string         `gorm:"column:type;type:enum('lost','found');not null;default:'lost';comment:帖子类型" json:"type"`
 	Title      string         `gorm:"column:title;type:varchar(2000);not null" json:"title"`
 	ImageURL   *string        `gorm:"column:image_url;type:varchar(1024);default:null;comment:图片URL" json:"image_url"` // 用指针类型表示“可为空”，NULL 与空字符串含义不同
@@ -73,6 +74,7 @@ type Comment struct {
 	ID        uint64         `gorm:"primaryKey;autoIncrement;comment:评论ID" json:"id"`
 	PostID    uint64         `gorm:"column:post_id;not null;index;comment:所属帖子ID" json:"post_id"`
 	UserID    uint64         `gorm:"column:user_id;not null;index;comment:评论作者ID" json:"user_id"`
+	AuthorName string         `gorm:"-" json:"author_name"` // 作者姓名：非表字段(gorm:"-")，查询后按 user_id 关联用户表回填，仅用于返回给前端
 	Content   string         `gorm:"column:content;type:varchar(1000);not null;comment:评论内容" json:"content"`
 	CreatedAt time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);comment:创建时间" json:"created_at"`
 	UpdatedAt time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`

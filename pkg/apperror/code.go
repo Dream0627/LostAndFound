@@ -67,4 +67,5 @@ var (
 	PostClaimSelfError              = NewError(400, "不能对自己发布的帖子发起申领/召领")
 	InvalidFinishRequestStatusError = NewError(400, "无效的完成申请状态")
 	FinishRequestNotPendingError    = NewError(400, "该完成申请不可处理")
+	AdminSecretError                = NewError(403, "管理员暗号错误")
 )

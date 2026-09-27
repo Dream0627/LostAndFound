@@ -28,7 +28,7 @@
       <h2 class="pd-title">{{ post.title }}</h2>
 
       <div class="pd-meta muted text-sm">
-        <span>作者 ID：{{ post.user_id }}</span>
+        <span>作者：{{ postAuthorName }}</span>
         <span>·</span>
         <span>{{ formatTime(post.created_at) }}</span>
         <template v-if="post.location_name">
@@ -39,7 +39,7 @@
 
       <p v-if="post.supplement" class="pd-supplement muted">补充说明：{{ post.supplement }}</p>
 
-      <img v-if="post.image_url" :src="post.image_url" class="pd-image" alt="帖子图片" />
+      <img v-if="post.image_url" :src="postImageSrc" class="pd-image" alt="帖子图片" />
 
       <p class="pd-content">{{ post.content }}</p>
 
@@ -71,7 +71,7 @@
       <ul v-else class="comment-list">
         <li v-for="c in comments" :key="c.id" class="comment-item">
           <div class="row-between">
-            <span class="comment-user">用户 {{ c.user_id }}</span>
+            <span class="comment-user">{{ c.author_name || ('用户 ' + c.user_id) }}</span>
             <div class="row">
               <span class="muted text-sm">{{ formatTime(c.created_at) }}</span>
               <button v-if="canDeleteComment(c)" class="btn btn-ghost btn-sm" @click="handleDeleteComment(c)">删除</button>
@@ -102,6 +102,7 @@ import { useToastStore } from "@/stores/toast";
 import StatusBadge from "@/components/StatusBadge.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import Pagination from "@/components/Pagination.vue";
+import { resolveImageUrl } from "@/utils/image";
 
 const route = useRoute();
 const router = useRouter();
@@ -129,6 +130,11 @@ const canDelete = computed(
 const canStartConversation = computed(
   () => auth.isLoggedIn && post.value && post.value.user_id !== auth.user?.id
 );
+
+const postAuthorName = computed(
+  () => post.value?.author_name || (post.value ? `用户 ${post.value.user_id}` : "")
+);
+const postImageSrc = computed(() => resolveImageUrl(post.value?.image_url));
 
 function canDeleteComment(c) {
   return auth.isLoggedIn && (auth.isPostAdmin || c.user_id === auth.user?.id);

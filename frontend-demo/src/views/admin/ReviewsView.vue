@@ -36,7 +36,7 @@
               </div>
               <p class="muted text-sm">{{ excerpt(p.content) }}</p>
               <p class="muted text-sm">
-                作者 ID：{{ p.user_id }} · {{ formatTime(p.created_at) }}
+                作者：{{ p.author_name || ('用户 ' + p.user_id) }} · {{ formatTime(p.created_at) }}
                 <template v-if="p.location_name"> · 📍 {{ p.location_name }}</template>
               </p>
             </div>
