@@ -199,14 +199,16 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 ## 8. 本次会话确认的坑（重要）
 
 1. **路由前缀是 `/api/v1/auth`，不是 `/api/v1/users`**：写文档/前端联调勿凭直觉写错。
-2. **注册（`service/user.go`）当前放开了角色限制**：`role != "student"` 的校验被注释（临时），`role` 为必填字段。生产环境请改为后台创建管理员或恢复校验。
+2. **注册管理员需暗号**：`role` 为 `postadmin`/`mainadmin` 时必须传 `admin_secret`，后端按角色分别匹配配置 `server.postadmin_secret` / `server.mainadmin_secret`（两暗号独立，防止越权注册）；配置为空则禁止注册该角色。学生注册无需该字段。请求体字段：`username/name/password/role` 必填，`admin_secret` 可选。
 3. **登录响应字段**：`{ access_token, token_type:"Bearer", expires_in, user }`；`expires_in` 来自 `config.jwt.expires`。
 4. **更新资料响应**：返回 `{ user, posts }`（含该用户帖子），不是裸 user。
 5. **发帖是 `multipart/form-data`**（因含可选图片字段名 `image`），其余多为 JSON。
 6. **图片只存相对路径**：`internal/handler/post/create.go` 存成 `/uploads/posts/xxx.png`，**不再写死主机**（历史遗留的 `server.public_base_url` / `buildPublicImageURL` 已移除）。同源访问由后端 `engine.Static("/uploads", "./uploads")` 与前端 Nginx `/uploads/` 反代提供。前端 `src/utils/image.js` 的 `resolveImageUrl` 会把历史绝对地址归一成 `/uploads/...`。
 7. **图片上传仍无大小/MIME 限制**：保存于 `./uploads/posts/`；上生产前建议补白名单与大小限制。
 8. **`gofmt -l` 全仓报错属既有现象**（CRLF / 既有格式），不要据此判断代码损坏。
-9. **热点函数签名（改前必查调用点）**：`router.New(db, jwtConfig)`、`repository.FillXxx`、`service.PageResult[T]` 的使用。
+9. **热点函数签名（改前必查调用点）**：`router.New(db, jwtConfig, corsAllowOrigins, postadminSecret, mainadminSecret)`、`service.NewUserService(repository, jwtConfig, postadminSecret, mainadminSecret)`、`repository.FillXxx`、`service.PageResult[T]` 的使用。
+10. **CORS**：`internal/middleware/cors.go` 按配置 `server.cors_allow_origins` 白名单回跨域头并处理 OPTIONS 预检；注册在最外层。同源部署（Nginx 反代）留空即可。
+11. **文档同步约定**：修改功能时须同步更新根 `README.md`（后端 API 文档）、`frontend-demo/README.md`（给前端同学的示例文档，与后端文档分开）与本文件；真实密钥/暗号/IP 等隐私内容不进公开仓库，由后端私发给前端。
 
 ---
 
@@ -217,7 +219,7 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 > ⚠️ `jwt` / `database` 在启动时已注入各服务，**热更新不生效，需重启**（代码里有对应提示打印）。
 
 结构体字段：
-- `server`: `port`(int)
+- `server`: `port`(int) / `cors_allow_origins`([]string) / `postadmin_secret` / `mainadmin_secret`
 - `database`: `enabled`(bool) / `host` / `port` / `username` / `password` / `name`
 - `jwt`: `secret` / `expires`(int64, 秒) / `issuer`
 

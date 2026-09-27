@@ -114,9 +114,10 @@
   | `username` | string | 是 | 学号，纯数字，1–32 字符 |
   | `name` | string | 是 | 姓名，1–32 字符 |
   | `password` | string | 是 | 密码，8–16 位 |
-  | `role` | string | 是 | 角色，如 `student`（受信任注册暂未限制） |
+  | `role` | string | 是 | 角色：`student`、`postadmin`、`mainadmin` |
+  | `admin_secret` | string | 否 | 仅注册 `postadmin` / `mainadmin` 时需要，暗号由后端配置 |
 - **响应**：返回创建的用户对象（不含密码哈希）
-- **常见错误**：`400` 参数非法；`409` 学号/工号已存在
+- **常见错误**：`400` 参数非法；`403` 管理员暗号错误；`409` 学号/工号已存在
 
 ### 2. 登录
 - **接口**：`POST /api/v1/auth/login`
@@ -429,7 +430,7 @@
 4. **如何删除评论？** 用 `DELETE /api/v1/comments/:comment_id`，普通用户只能删自己的评论。
 5. **列表为何返回空？** 普通用户强制只看 `approved`，无匹配则为空数组。
 6. **token 失效怎么办？** 重新登录获取新 `access_token` 并替换请求头。
-7. **如何成为管理员？** 代码中注册角色校验 `role != "student"` 已被注释（临时放开）；生产环境请由后台创建管理员账号。
+7. **如何注册管理员？** 注册 `postadmin` 或 `mainadmin` 时需在请求体中提供 `admin_secret`，后端按角色校验对应暗号；暗号配在服务器 `config/config.docker.yaml` 的 `postadmin_secret` / `mainadmin_secret` 中，仅管理员知晓。学生注册无需该字段。
 
 ---
 

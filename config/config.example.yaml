@@ -3,8 +3,10 @@ server:
   cors_allow_origins:
     - "http://localhost:5173"
     - "http://localhost:9090"
-  # 注册管理员时需要出示的暗号；生产环境请改成复杂值。
-  admin_secret: "YourAdminSecret"
+  # 注册管理员时需要出示的暗号：postadmin/mainadmin 分开设置，防止越权注册。
+  # 生产环境请改成复杂值。
+  postadmin_secret: "YourPostadminSecret"
+  mainadmin_secret: "YourMainadminSecret"
 
 database:
   enabled: true

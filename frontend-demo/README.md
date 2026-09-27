@@ -93,7 +93,7 @@ frontend-demo/
 
 | 接口 | 方法 | 鉴权 | 前端位置 |
 |---|---|---|---|
-| `/auth/register` | POST | 公开 | `views/RegisterView.vue` → `api/auth.register` |
+| `/auth/register` | POST | 公开 | `views/RegisterView.vue` → `api/auth.register`（管理员注册需额外传入 `admin_secret`） |
 | `/auth/login` | POST | 公开 | `views/LoginView.vue` → `api/auth.login` |
 | `/auth/profile` | GET | 需登录 | `views/ProfileView.vue` → `api/auth.getProfile` |
 | `/auth/profile` | PATCH | 需登录 | `views/ProfileView.vue` → `api/auth.updateProfile` |
@@ -190,4 +190,4 @@ frontend-demo/
 2. **坐标系**：浏览器与后端预设均为 WGS-84；接入高德等 GCJ-02 地图时需先纠偏。
 3. **用户列表**：后端未提供“用户列表/搜索”接口，`UsersView` 以“输入用户 ID”为入口执行注销/恢复。
 4. **图片**：帖子图片 URL 形如 `http://localhost:8080/uploads/posts/...`，开发环境经 `/uploads` 代理直接可显示。
-5. **管理员账号**：代码中注册角色校验已临时放开，可直接注册 `postadmin` / `mainadmin` 用于联调；生产环境请由后台创建。
+5. **管理员注册**：注册 `postadmin` / `mainadmin` 时需在请求体中提供 `admin_secret`，后端按角色校验对应暗号，校验通过方可注册；暗号由服务器后端管理员私发，不会在公开仓库中提供。学生注册无需该字段。

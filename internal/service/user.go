@@ -21,11 +21,12 @@ import (
 // 预编译一次可避免每次注册都重新编译，提升效率。
 var numericUsername = regexp.MustCompile(`^[0-9]+$`)
 
-// UserService 依赖用户仓库、JWT 配置(登录时签发令牌)与管理员暗号(注册管理员时校验)。
+// UserService 依赖用户仓库、JWT 配置(登录时签发令牌)与两类管理员暗号(注册管理员时校验)。
 type UserService struct {
-	repository  *repository.UserRepository
-	jwt         config.JWTConfig
-	adminSecret string
+	repository      *repository.UserRepository
+	jwt             config.JWTConfig
+	postadminSecret string
+	mainadminSecret string
 }
 
 // RegisterInput 是注册的业务入参 DTO。
@@ -52,12 +53,13 @@ type tokenClaims struct {
 	jwt.RegisteredClaims
 }
 
-// NewUserService 由 router 注入用户仓库、JWT 配置与管理员暗号。
-func NewUserService(repository *repository.UserRepository, jwtConfig config.JWTConfig, adminSecret string) *UserService {
+// NewUserService 由 router 注入用户仓库、JWT 配置与两类管理员暗号。
+func NewUserService(repository *repository.UserRepository, jwtConfig config.JWTConfig, postadminSecret, mainadminSecret string) *UserService {
 	return &UserService{
-		repository:  repository,
-		jwt:         jwtConfig,
-		adminSecret: adminSecret,
+		repository:      repository,
+		jwt:             jwtConfig,
+		postadminSecret: postadminSecret,
+		mainadminSecret: mainadminSecret,
 	}
 }
 
@@ -88,9 +90,14 @@ func (s *UserService) Register(input RegisterInput) (*model.User, error) {
 	// 	return nil, apperror.ParamError
 	// }
 
-	// 注册管理员需要暗号校验。
-	if input.Role == "postadmin" || input.Role == "mainadmin" {
-		if s.adminSecret == "" || input.AdminSecret != s.adminSecret {
+	// 注册管理员需要对应角色的暗号：两种管理员暗号分开，防止持有一个暗号越权注册另一种。
+	switch input.Role {
+	case "postadmin":
+		if s.postadminSecret == "" || input.AdminSecret != s.postadminSecret {
+			return nil, apperror.AdminSecretError
+		}
+	case "mainadmin":
+		if s.mainadminSecret == "" || input.AdminSecret != s.mainadminSecret {
 			return nil, apperror.AdminSecretError
 		}
 	}
