@@ -22,9 +22,11 @@ func GetPost(postService *service.PostService) gin.HandlerFunc {
 			return
 		}
 
+		nowUserID, _ := middleware.CurrentUserID(c)
 		nowUserRole, _ := middleware.CurrentRole(c)
 
-		post, err := postService.GetVisiblePost(postID, nowUserRole) // 按角色返回“可见的”帖子(未审核帖子对普通用户不可见)
+		// 按角色与身份返回“可见的”帖子：管理员/作者本人可见未审核帖，其他普通用户仅见已通过帖。
+		post, err := postService.GetVisiblePost(postID, nowUserID, nowUserRole)
 		if err != nil {
 			apperror.AbortWithError(c, err)
 			return

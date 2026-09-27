@@ -62,7 +62,7 @@
         <router-link to="/posts/new" class="btn">去发布</router-link>
       </EmptyState>
       <div v-else class="grid grid-posts">
-        <PostCard v-for="p in myPosts" :key="p.id" :post="p" :show-status="auth.isPostAdmin" />
+        <PostCard v-for="p in myPosts" :key="p.id" :post="p" show-status />
       </div>
     </div>
 

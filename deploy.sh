@@ -26,19 +26,24 @@ ask()  {
 }
 
 # ---- 0. 内存 / swap 自检（2G 机器构建 + MySQL 易 OOM）---------------------
+# 注意：低内存机器无 swap 时 Go 编译/链接会吃光内存导致整机换页假死、SSH 无响应
+# （1.7G 机器实测：包编译限并行后仍在链接阶段 wa 91%），故这里【自动创建】4G swap，
+# 不再依赖可能被随手跳过的交互提问。
+# 确实要跳过（例如自有 swap 方案）： SKIP_SWAP=1 bash deploy.sh
 MEM_MB=$(awk '/MemTotal/{printf "%d",$2/1024}' /proc/meminfo 2>/dev/null || echo 0)
 SWAP_MB=$(awk '/SwapTotal/{printf "%d",$2/1024}' /proc/meminfo 2>/dev/null || echo 0)
-if [ "$MEM_MB" -gt 0 ] && [ "$MEM_MB" -lt 2560 ] && [ "$SWAP_MB" -lt 512 ]; then
-  warn "检测到内存 ${MEM_MB}MB 且几乎无 swap，构建镜像/启动 MySQL 可能 OOM。"
-  if ask "是否创建 2GB swap 交换文件？"; then
-    if [ ! -f /swapfile ]; then
-      fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048
-      chmod 600 /swapfile; mkswap /swapfile >/dev/null; swapon /swapfile
-      grep -q '/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
-      log "已启用 2GB swap"
-    else
-      warn "/swapfile 已存在，跳过"
-    fi
+if [ "$MEM_MB" -gt 0 ] && [ "$MEM_MB" -lt 2560 ] && [ "$SWAP_MB" -lt 2048 ]; then
+  if [ "${SKIP_SWAP:-0}" = "1" ]; then
+    warn "内存 ${MEM_MB}MB、swap ${SWAP_MB}MB，且已指定 SKIP_SWAP=1：跳过 swap 创建，构建可能 OOM 假死。"
+  elif [ ! -f /swapfile ]; then
+    warn "检测到内存 ${MEM_MB}MB 且 swap 仅 ${SWAP_MB}MB，构建前自动创建 4GB swap ..."
+    fallocate -l 4G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=4096
+    chmod 600 /swapfile; mkswap /swapfile >/dev/null; swapon /swapfile
+    grep -q '/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    log "已启用 4GB swap（已写入 /etc/fstab，重启后依然生效）"
+  else
+    warn "/swapfile 已存在但当前 swap 不足，尝试重新启用"
+    swapon /swapfile 2>/dev/null || true
   fi
 fi
 

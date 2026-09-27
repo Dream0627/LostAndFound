@@ -31,9 +31,9 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, corsAllowOrigins []string, pos
 	engine.Use(middleware.ErrorHandler())         // 注册全局错误处理中间件，统一兜底错误响应
 	engine.Static("/uploads", "./uploads")        // 把本地上传目录映射成静态资源，使图片可通过 /uploads/... 直接访问
 
-	userRepository := repository.NewUserRepository(db)                              // 装配阶段：先建仓库
+	userRepository := repository.NewUserRepository(db)                                                 // 装配阶段：先建仓库
 	userService := service.NewUserService(userRepository, jwtConfig, postadminSecret, mainadminSecret) // 再建服务，注入仓库与暗号
-	geoService := service.NewGeoService() // 地理位置服务(无外部依赖，公开接口)
+	geoService := service.NewGeoService()                                                              // 地理位置服务(无外部依赖，公开接口)
 	postRepository := repository.NewPostRepository(db)
 	postService := service.NewPostService(postRepository, geoService) // 注入 geoService：发布帖子时解析地点/坐标
 	postAdminService := service.NewPostAdminService(postRepository)
@@ -66,7 +66,7 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, corsAllowOrigins []string, pos
 	post.DELETE("/:post_id", middleware.Auth(jwtConfig), posthandler.DeletePost(postService))
 	post.PATCH("/:post_id/recover", middleware.Auth(jwtConfig), posthandler.RecoverPost(postService))
 	post.PATCH("/:post_id/review", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.ReviewPost(postAdminService)) // 审核帖子：先登录校验，再要求管理员角色
-	post.POST("/:post_id/conversations", middleware.Auth(jwtConfig), conversationhandler.Start(conversationService)) // 申领/召领：开启对话(按帖子 type 自动判定)
+	post.POST("/:post_id/conversations", middleware.Auth(jwtConfig), conversationhandler.Start(conversationService))                                                      // 申领/召领：开启对话(按帖子 type 自动判定)
 	post.GET("/:post_id/comments", commenthandler.List(commentService))                                                                                                   // 评论列表仍挂在帖子下(读操作，语义上属于某帖的评论)
 
 	comment := engine.Group("/api/v1/comments")                                                       // 评论相关路由分组
@@ -80,13 +80,14 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, corsAllowOrigins []string, pos
 	geoGroup.GET("/locations", geohandler.ListLocations(geoService)) // 校园预设地点列表
 	geoGroup.POST("/locate", geohandler.Locate(geoService))          // 定位/匹配最近地点
 
-	conversationGroup := engine.Group("/api/v1/conversations") // 对话相关路由分组(均需登录)
-	conversationGroup.GET("", middleware.Auth(jwtConfig), conversationhandler.List(conversationService)) // 我的对话列表
-	conversationGroup.GET("/:conversation_id/messages", middleware.Auth(jwtConfig), conversationhandler.ListMessages(conversationService)) // 对话消息列表
-	conversationGroup.POST("/:conversation_id/messages", middleware.Auth(jwtConfig), conversationhandler.SendMessage(conversationService)) // 发送消息
-	conversationGroup.POST("/:conversation_id/finish-requests", middleware.Auth(jwtConfig), conversationhandler.Finish(conversationService)) // 发起完成寻找申请
-	conversationGroup.PATCH("/:conversation_id/finish-requests/:request_id", middleware.Auth(jwtConfig), conversationhandler.ReviewFinish(conversationService)) // 处理完成寻找申请
-	conversationGroup.GET("/:conversation_id/finish-requests", middleware.Auth(jwtConfig), conversationhandler.GetPendingFinish(conversationService)) // 查询待处理的完成寻找申请
+	conversationGroup := engine.Group("/api/v1/conversations")                                                                                                     // 对话相关路由分组(均需登录)
+	conversationGroup.GET("", middleware.Auth(jwtConfig), conversationhandler.List(conversationService))                                                           // 我的对话列表
+	conversationGroup.GET("/:conversation_id", middleware.Auth(jwtConfig), conversationhandler.Get(conversationService))                                           // 会话详情(含所属帖子快照)
+	conversationGroup.GET("/:conversation_id/messages", middleware.Auth(jwtConfig), conversationhandler.ListMessages(conversationService))                         // 对话消息列表
+	conversationGroup.POST("/:conversation_id/messages", middleware.Auth(jwtConfig), conversationhandler.SendMessage(conversationService))                         // 发送消息
+	conversationGroup.POST("/:conversation_id/finish-requests", middleware.Auth(jwtConfig), conversationhandler.Finish(conversationService))                       // 发起完成寻找申请
+	conversationGroup.PATCH("/:conversation_id/finish-requests/:request_id", middleware.Auth(jwtConfig), conversationhandler.ReviewFinish(conversationService))    // 处理完成寻找申请
+	conversationGroup.GET("/:conversation_id/finish-requests", middleware.Auth(jwtConfig), conversationhandler.GetPendingFinish(conversationService))              // 查询待处理的完成寻找申请
 	conversationGroup.DELETE("/:conversation_id/finish-requests/:request_id", middleware.Auth(jwtConfig), conversationhandler.WithdrawFinish(conversationService)) // 发起方撤回完成寻找申请
 
 	admin := engine.Group("/api/v1/admin") // 管理员路由分组(叠加角色校验)

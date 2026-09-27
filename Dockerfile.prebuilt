@@ -1,0 +1,42 @@
+# ============================================================================
+# LAF 后端镜像（预编译二进制版，供 1~2G 小内存服务器使用）
+#
+# 背景：标准 Dockerfile 在服务器上用 golang 镜像编译，链接阶段内存峰值大，
+# 1.7G 内存机器即使配 4G swap + GOMEMLIMIT 仍可能换页假死。
+# 因此改为在开发机交叉编译好 Linux 二进制，服务器只负责复制打包（秒级、不吃内存）。
+#
+# 开发机（仓库根目录）交叉编译：
+#   # Linux / macOS
+#   CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+#     go build -trimpath -ldflags="-s -w" -o laf-linux .
+#   # Windows PowerShell
+#   $env:CGO_ENABLED=0; $env:GOOS="linux"; $env:GOARCH="amd64"
+#   go build -trimpath -ldflags="-s -w" -o laf-linux .
+#
+# 服务器上把本文件替换为 Dockerfile 后正常 docker compose build 即可。
+# ============================================================================
+
+FROM alpine:3.20
+
+# ca-certificates：如后续需要外呼 HTTPS；tzdata：日志时间与 DSN 的 loc=Local 会用到时区。
+RUN apk add --no-cache ca-certificates tzdata \
+	&& ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+
+WORKDIR /app
+
+# 开发机预编译好的静态二进制（CGO_ENABLED=0，无需 libc 兼容层）。
+COPY laf-linux /app/laf
+RUN chmod +x /app/laf
+
+# 运行期需要的非代码资源：
+#  - config/：放一份 .example 作模板；真正的 config.yaml 由 compose 挂载注入。
+#  - migrations/：建库建表 SQL，供首次初始化数据库时使用。
+COPY config/config.example.yaml /app/config/config.example.yaml
+COPY migrations /app/migrations
+
+# 帖子图片写盘目录（engine.Static 把 ./uploads 映射为 /uploads 静态资源）。
+RUN mkdir -p /app/uploads/posts
+
+EXPOSE 8080
+
+CMD ["/app/laf"]

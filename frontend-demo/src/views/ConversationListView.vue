@@ -24,12 +24,20 @@
           <div class="conv-avatar">#{{ c.id }}</div>
           <div class="conv-body">
             <div class="conv-title">
-              帖子 #{{ c.post_id }}
+              {{ c.post_title || `帖子 #${c.post_id}` }}
+              <span v-if="c.post_is_finished" class="finish-tag">已完成</span>
               <span class="muted text-sm">
                 · 我{{ c.initiator_id === auth.user?.id ? "发起的申领/召领" : "是楼主" }}
               </span>
             </div>
-            <div class="muted text-sm">发起人 ID：{{ c.initiator_id }} · 楼主 ID：{{ c.owner_id }}</div>
+            <div class="muted text-sm">
+              <router-link
+                :to="`/posts/${c.post_id}`"
+                class="post-link"
+                @click.stop
+              >查看原帖 #{{ c.post_id }}</router-link>
+              <span> · 发起人 ID：{{ c.initiator_id }} · 楼主 ID：{{ c.owner_id }}</span>
+            </div>
           </div>
           <div class="conv-time muted text-sm">{{ formatTime(c.created_at) }}</div>
         </li>
@@ -125,5 +133,23 @@ onMounted(fetchList);
 }
 .conv-title {
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.finish-tag {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-primary-dark);
+  background: var(--color-primary-soft);
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+.post-link {
+  color: var(--color-primary-dark);
+}
+.post-link:hover {
+  text-decoration: underline;
 }
 </style>

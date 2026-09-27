@@ -2,6 +2,7 @@
 import http from "./http";
 
 // 注册：{ username(纯数字学号), name, password(8-16), role }
+// 管理员角色(postadmin/mainadmin)需额外带 admin_secret；学生注册不带该字段。
 export function register(data) {
   return http.post("/auth/register", data);
 }

@@ -86,7 +86,49 @@ func (s *ConversationService) GetMyConversations(userID uint64, page, pageSize i
 	if err != nil {
 		return nil, err
 	}
+	for _, conversation := range conversations {
+		s.fillPostSnapshot(conversation) // 回填帖子标题/完成状态，供会话列表展示
+	}
 	return &ConversationListResult{List: conversations, Total: total, Page: page, PageSize: pageSize}, nil
+}
+
+// GetConversationDetail 查询单个对话(仅参与方)，并回填所属帖子快照。
+// 供聊天页展示帖子标题、跳转原帖、在帖子已完成时隐藏“发起完成寻找”入口。
+func (s *ConversationService) GetConversationDetail(conversationID, userID uint64) (*model.Conversation, error) {
+	conversation, err := s.conversationRepository.GetConversationByID(conversationID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.checkParticipant(conversation, userID); err != nil {
+		return nil, err
+	}
+	s.fillPostSnapshot(conversation)
+	return conversation, nil
+}
+
+// fillPostSnapshot 把帖子标题/审核状态/完成状态回填到对话的非表字段。
+// 帖子可能已被删除，此时查询报错则保留零值，不影响对话本身的访问。
+func (s *ConversationService) fillPostSnapshot(conversation *model.Conversation) {
+	if conversation == nil {
+		return
+	}
+	post, err := s.postRepository.GetPostByID(conversation.PostID)
+	if err != nil {
+		return
+	}
+	conversation.PostTitle = post.Title
+	conversation.PostStatus = post.Status
+	conversation.PostFinished = post.IsFinished
+}
+
+// addSystemMessage 往对话里写一条系统消息(SenderID 为 NULL 表示系统)。
+// 系统消息仅用于过程留痕，写入失败不应阻断主流程，故忽略错误。
+func (s *ConversationService) addSystemMessage(conversationID uint64, content string) {
+	_ = s.messageRepository.Create(&model.Message{
+		ConversationID: conversationID,
+		SenderID:       nil,
+		Content:        content,
+	})
 }
 
 // checkParticipant 校验用户是否为该对话的参与方(发起方或楼主)，否则返回无权访问。
@@ -136,7 +178,7 @@ func (s *ConversationService) SendMessage(conversationID, userID uint64, content
 
 	message := &model.Message{
 		ConversationID: conversationID,
-		SenderID:       userID,
+		SenderID:       &userID,
 		Content:        content,
 	}
 	if err := s.messageRepository.Create(message); err != nil {
@@ -180,6 +222,8 @@ func (s *ConversationService) CreateFinishRequest(conversationID, userID uint64)
 	if err := s.finishRequestRepository.Create(request); err != nil {
 		return nil, err
 	}
+	// 过程留痕：在对话中生成一条系统消息，双方都能看到。
+	s.addSystemMessage(conversationID, "一方发起了“完成寻找”申请，等待对方确认")
 	return request, nil
 }
 
@@ -221,6 +265,9 @@ func (s *ConversationService) ReviewFinishRequest(conversationID, requestID, use
 		if err := s.postRepository.SetPostFinished(conversation.PostID, true); err != nil {
 			return nil, err
 		}
+		s.addSystemMessage(conversationID, "“完成寻找”申请已通过，帖子已标记为已完成")
+	} else {
+		s.addSystemMessage(conversationID, "“完成寻找”申请被拒绝，双方可继续沟通后重新发起")
 	}
 	return request, nil
 }
@@ -262,5 +309,9 @@ func (s *ConversationService) WithdrawFinishRequest(conversationID, requestID, u
 	if request.RequesterID != userID {
 		return apperror.UserForbiddenError // 只有发起方能撤回自己的申请
 	}
-	return s.finishRequestRepository.Delete(requestID)
+	if err := s.finishRequestRepository.Delete(requestID); err != nil {
+		return err
+	}
+	s.addSystemMessage(conversationID, "发起方已撤回“完成寻找”申请")
+	return nil
 }

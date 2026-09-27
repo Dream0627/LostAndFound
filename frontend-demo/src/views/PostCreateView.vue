@@ -120,7 +120,8 @@ async function handleSubmit() {
     }
 
     const created = await createPost(fd);
-    toast.success("发布成功");
+    // 学生发帖默认 pending；管理员发帖直接 approved。按返回状态给出准确提示。
+    toast.success(created.status === "pending" ? "发布成功，等待管理员审核" : "发布成功");
     router.push(`/posts/${created.id}`);
   } catch (e) {
     errorMsg.value = e?.msg || "发布失败，请稍后重试";

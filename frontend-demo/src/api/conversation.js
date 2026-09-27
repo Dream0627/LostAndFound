@@ -6,6 +6,11 @@ export function listMyConversations(params = {}) {
   return http.get("/conversations", { params });
 }
 
+// 会话详情：含所属帖子快照（post_title/post_status/post_is_finished），仅参与方。
+export function getConversation(conversationId) {
+  return http.get(`/conversations/${conversationId}`);
+}
+
 // 会话消息列表（分页，仅参与方）。按 id 倒序（新消息在前）。
 export function listMessages(conversationId, params = {}) {
   return http.get(`/conversations/${conversationId}/messages`, { params });

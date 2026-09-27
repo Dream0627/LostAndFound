@@ -16,11 +16,15 @@
         <div class="row">
           <StatusBadge kind="type" :value="post.type" />
           <StatusBadge kind="finished" :value="post.is_finished" />
-          <StatusBadge v-if="auth.isPostAdmin" kind="status" :value="post.status" />
+          <StatusBadge v-if="auth.isPostAdmin || isOwner" kind="status" :value="post.status" />
         </div>
         <div class="row">
-          <button v-if="canManage" class="btn btn-ghost btn-sm" @click="handleReview('approved')">通过</button>
-          <button v-if="canManage" class="btn btn-ghost btn-sm" @click="handleReview('rejected')">驳回</button>
+          <!-- 待审核/被驳回：走审核接口 -->
+          <button v-if="canReview" class="btn btn-ghost btn-sm" @click="handleReview('approved')">通过</button>
+          <button v-if="canReview" class="btn btn-ghost btn-sm" @click="handleReview('rejected')">驳回</button>
+          <!-- 已通过：管理员仍可直接改状态（下架/打回待审） -->
+          <button v-if="canAdjust" class="btn btn-ghost btn-sm" @click="handleStatusChange('pending')">打回待审</button>
+          <button v-if="canAdjust" class="btn btn-ghost btn-sm" @click="handleStatusChange('rejected')">下架</button>
           <button v-if="canDelete" class="btn btn-danger btn-sm" @click="handleDelete">删除</button>
         </div>
       </div>
@@ -35,6 +39,14 @@
           <span>·</span>
           <span>📍 {{ post.location_name }}</span>
         </template>
+      </div>
+
+      <!-- 作者查看自己的非公开帖时给出明确提示 -->
+      <div v-if="isOwner && !auth.isPostAdmin && post.status === 'pending'" class="alert alert-warning mt-8">
+        该帖子正在等待管理员审核，暂未对其他用户公开。
+      </div>
+      <div v-else-if="isOwner && !auth.isPostAdmin && post.status === 'rejected'" class="alert alert-warning mt-8">
+        该帖子未通过审核（已驳回），仅你和管理员可见。
       </div>
 
       <p v-if="post.supplement" class="pd-supplement muted">补充说明：{{ post.supplement }}</p>
@@ -54,7 +66,7 @@
 
     <!-- 评论区 -->
     <div class="card">
-      <h3>评论（{{ comments.length }}）</h3>
+      <h3>评论（{{ cTotal }}）</h3>
 
       <div v-if="auth.isLoggedIn" class="comment-form">
         <textarea v-model.trim="commentText" class="textarea" maxlength="1000" placeholder="说点什么…"></textarea>
@@ -97,6 +109,7 @@ import {
   startConversation,
 } from "@/api/post";
 import { createComment, deleteComment } from "@/api/comment";
+import { updatePostStatus } from "@/api/admin";
 import { useAuthStore } from "@/stores/auth";
 import { useToastStore } from "@/stores/toast";
 import StatusBadge from "@/components/StatusBadge.vue";
@@ -121,8 +134,14 @@ const cTotal = ref(0);
 const commentText = ref("");
 const posting = ref(false);
 
-const canManage = computed(
+const isOwner = computed(() => auth.isLoggedIn && post.value?.user_id === auth.user?.id);
+// 未完成的非 approved 帖：管理员可走审核流（通过/驳回）。
+const canReview = computed(
   () => auth.isPostAdmin && !post.value?.is_finished && post.value?.status !== "approved"
+);
+// 已通过的帖子：管理员可随时改状态（下架=rejected、打回待审=pending）。
+const canAdjust = computed(
+  () => auth.isPostAdmin && !post.value?.is_finished && post.value?.status === "approved"
 );
 const canDelete = computed(
   () => auth.isLoggedIn && (auth.isPostAdmin || post.value?.user_id === auth.user?.id)
@@ -169,9 +188,27 @@ async function fetchComments() {
 }
 
 async function handleReview(status) {
+  const tip = status === "approved" ? "确定通过该帖子的审核？" : "确定驳回该帖子？驳回后仅作者与管理员可见。";
+  if (!window.confirm(tip)) return;
   try {
     await reviewPost(postId, status);
     toast.success(status === "approved" ? "已通过审核" : "已驳回");
+    fetchPost();
+  } catch (e) {
+    toast.error(e?.msg || "操作失败");
+  }
+}
+
+// 管理员直接修改“已通过”帖子的状态（PATCH /admin/posts/:id/status）。
+async function handleStatusChange(status) {
+  const tip =
+    status === "rejected"
+      ? "确定下架该帖子？下架后其他用户将无法在广场看到它。"
+      : "确定把该帖子打回待审核？";
+  if (!window.confirm(tip)) return;
+  try {
+    await updatePostStatus(postId, status);
+    toast.success(status === "rejected" ? "已下架" : "已设为待审核");
     fetchPost();
   } catch (e) {
     toast.error(e?.msg || "操作失败");

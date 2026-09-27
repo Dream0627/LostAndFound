@@ -32,6 +32,18 @@
             <option value="mainadmin">超级管理员</option>
           </select>
         </div>
+        <!-- 仅注册管理员时需要暗号；学生不显示也不上报该字段。 -->
+        <div v-if="form.role !== 'student'" class="field">
+          <label>管理员暗号</label>
+          <input
+            v-model.trim="form.admin_secret"
+            type="password"
+            class="input"
+            :placeholder="form.role === 'mainadmin' ? '请输入超级管理员暗号' : '请输入帖子管理员暗号'"
+            autocomplete="off"
+          />
+          <p class="field-hint text-sm">注册管理员需向系统管理员索取对应暗号。</p>
+        </div>
         <button class="btn btn-block" :disabled="loading" type="submit">
           {{ loading ? "注册中…" : "注册" }}
         </button>
@@ -53,7 +65,14 @@ import { useToastStore } from "@/stores/toast";
 const toast = useToastStore();
 const router = useRouter();
 
-const form = reactive({ username: "", name: "", password: "", confirm: "", role: "student" });
+const form = reactive({
+  username: "",
+  name: "",
+  password: "",
+  confirm: "",
+  role: "student",
+  admin_secret: "",
+});
 const loading = ref(false);
 const errorMsg = ref("");
 
@@ -62,6 +81,7 @@ function validate() {
   if (!form.name) return "请输入姓名";
   if (form.password.length < 8 || form.password.length > 16) return "密码须为 8–16 位";
   if (form.password !== form.confirm) return "两次输入的密码不一致";
+  if (form.role !== "student" && !form.admin_secret) return "请输入管理员暗号";
   return "";
 }
 
@@ -69,13 +89,16 @@ async function handleSubmit() {
   errorMsg.value = validate();
   if (errorMsg.value) return;
   loading.value = true;
+  // 学生注册不带 admin_secret；仅管理员携带，交由后端按角色校验对应暗号。
+  const payload = {
+    username: form.username,
+    name: form.name,
+    password: form.password,
+    role: form.role,
+  };
+  if (form.role !== "student") payload.admin_secret = form.admin_secret;
   try {
-    await register({
-      username: form.username,
-      name: form.name,
-      password: form.password,
-      role: form.role,
-    });
+    await register(payload);
     toast.success("注册成功，请登录");
     router.push({ name: "login" });
   } catch (e) {
@@ -102,6 +125,10 @@ async function handleSubmit() {
 .auth-foot {
   margin-top: 18px;
   text-align: center;
+  color: var(--color-text-muted);
+}
+.field-hint {
+  margin-top: 6px;
   color: var(--color-text-muted);
 }
 </style>

@@ -8,11 +8,16 @@
       <div class="row-between">
         <div class="row">
           <button class="btn btn-ghost btn-sm" @click="$router.push('/conversations')">← 消息</button>
-          <h3 class="chat-title">会话 #{{ conversationId }}</h3>
+          <div class="chat-title">
+            <router-link v-if="conversation?.post_id" :to="`/posts/${conversation.post_id}`" class="chat-post-link">
+              {{ conversation.post_title || `帖子 #${conversation.post_id}` }}
+            </router-link>
+            <span v-else>会话 #{{ conversationId }}</span>
+          </div>
         </div>
         <div class="row">
           <button
-            v-if="!pendingRequest"
+            v-if="!pendingRequest && !postFinished"
             class="btn btn-sm"
             :disabled="finishLoading"
             @click="handleCreateFinishRequest"
@@ -20,6 +25,11 @@
             发起完成寻找
           </button>
         </div>
+      </div>
+
+      <!-- 帖子已完成：仅展示状态，不再允许发起申请 -->
+      <div v-if="postFinished && !pendingRequest" class="finish-done-banner mt-8">
+        ✓ 该帖子已完成寻找
       </div>
 
       <div v-if="pendingRequest" class="finish-banner mt-8">
@@ -46,8 +56,13 @@
       <EmptyState v-else-if="messages.length === 0" text="还没有消息，打个招呼吧" icon="👋" />
 
       <ul v-else class="msg-list">
-        <li v-for="m in orderedMessages" :key="m.id" class="msg" :class="{ mine: isMine(m) }">
-          <div class="msg-bubble">
+        <li
+          v-for="m in orderedMessages"
+          :key="m.id"
+          :class="isSystem(m) ? 'msg msg-system' : ['msg', { mine: isMine(m) }]"
+        >
+          <div v-if="isSystem(m)" class="msg-system-text">{{ m.content }}</div>
+          <div v-else class="msg-bubble">
             <div class="msg-text">{{ m.content }}</div>
             <div class="msg-time">{{ formatTime(m.created_at) }}</div>
           </div>
@@ -83,6 +98,7 @@ import {
   handleFinishRequest,
   getPendingFinishRequest,
   withdrawFinishRequest,
+  getConversation,
 } from "@/api/conversation";
 import { useAuthStore } from "@/stores/auth";
 import { useToastStore } from "@/stores/toast";
@@ -93,6 +109,7 @@ const auth = useAuthStore();
 const toast = useToastStore();
 
 const conversationId = route.params.id;
+const conversation = ref(null); // 会话详情（含所属帖子快照）
 const messages = ref([]);
 const loading = ref(false);
 const sending = ref(false);
@@ -104,8 +121,16 @@ const listRef = ref(null);
 // 后端返回新消息在前，反转成时间升序（旧→新）更符合聊天直觉。
 const orderedMessages = computed(() => [...messages.value].reverse());
 
+// 帖子是否已完成（以后端回填的快照为准），已完成时不再显示发起入口。
+const postFinished = computed(() => Boolean(conversation.value?.post_is_finished));
+
 function isMine(m) {
   return m.sender_id === auth.user?.id;
+}
+
+// sender_id 为 null 是后端写入的系统消息（完成申请发起/处理/撤回留痕）。
+function isSystem(m) {
+  return m.sender_id === null || m.sender_id === undefined;
 }
 
 function formatTime(value) {
@@ -151,6 +176,7 @@ async function handleCreateFinishRequest() {
     const req = await createFinishRequest(conversationId);
     pendingRequest.value = req;
     toast.success("已发起完成寻找申请");
+    fetchMessages();
   } catch (e) {
     toast.error(e?.msg || "发起失败");
   } finally {
@@ -165,11 +191,22 @@ async function handleHandle(status) {
     await handleFinishRequest(conversationId, pendingRequest.value.id, status);
     toast.success(status === "agreed" ? "已同意，帖子已完成" : "已拒绝");
     pendingRequest.value = null;
+    if (status === "agreed" && conversation.value) {
+      conversation.value.post_is_finished = true; // 本地立即同步，避免按钮闪回
+    }
     fetchMessages();
   } catch (e) {
     toast.error(e?.msg || "处理失败");
   } finally {
     finishLoading.value = false;
+  }
+}
+
+async function fetchConversation() {
+  try {
+    conversation.value = await getConversation(conversationId);
+  } catch (e) {
+    conversation.value = null;
   }
 }
 
@@ -188,6 +225,7 @@ async function handleWithdraw() {
     await withdrawFinishRequest(conversationId, pendingRequest.value.id);
     toast.success("已撤回申请");
     pendingRequest.value = null;
+    fetchMessages();
   } catch (e) {
     toast.error(e?.msg || "撤回失败");
   } finally {
@@ -196,6 +234,7 @@ async function handleWithdraw() {
 }
 
 onMounted(() => {
+  fetchConversation();
   fetchMessages(true);
   fetchPendingRequest();
 });
@@ -214,6 +253,16 @@ onMounted(() => {
 }
 .chat-title {
   margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+}
+.chat-post-link {
+  color: var(--color-primary-dark);
+}
+.chat-post-link:hover {
+  text-decoration: underline;
 }
 .finish-banner {
   display: flex;
@@ -223,6 +272,13 @@ onMounted(() => {
   flex-wrap: wrap;
   background: var(--color-warning-soft);
   color: var(--color-warning);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+}
+.finish-done-banner {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-dark);
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   font-size: 14px;
@@ -245,6 +301,18 @@ onMounted(() => {
 }
 .msg.mine {
   justify-content: flex-end;
+}
+.msg-system {
+  justify-content: center;
+}
+.msg-system-text {
+  max-width: 85%;
+  font-size: 12px;
+  color: var(--color-text-light);
+  background: var(--color-bg-muted, #f1f3f5);
+  border-radius: 10px;
+  padding: 4px 12px;
+  text-align: center;
 }
 .msg-bubble {
   max-width: 70%;

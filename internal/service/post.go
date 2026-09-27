@@ -174,17 +174,18 @@ func (s *PostService) GetPosts(types []string, statuses []string, finished *bool
 }
 
 // GetVisiblePost 查询“对当前用户可见”的帖子详情。
-// 关键点：如果调用者不是管理员，且帖子状态不是 approved，就当作“不存在”返回。
-// 用“不存在”而非“无权限”，可避免暴露“这个 id 上其实有个未审核帖子”的信息。
-func (s *PostService) GetVisiblePost(postID uint64, role string) (*model.Post, error) {
+// 关键点：管理员可见任意状态；帖子作者本人可见自己的任意状态帖子(便于查看审核进度/驳回原因)；
+// 其他普通用户仅可见 approved。非作者访问未审核帖时返回“不存在”，
+// 避免暴露“这个 id 上其实有个未审核帖子”的信息。
+func (s *PostService) GetVisiblePost(postID, userID uint64, role string) (*model.Post, error) {
 	post, err := s.repository.GetPostByID(postID)
 	if err != nil {
 		return nil, err
 	}
-	if err := ensurePostVisible(post, role); err != nil {
-		return nil, err
+	if isPostAdmin(role) || post.Status == model.PostStatusApproved || post.UserID == userID {
+		return post, nil
 	}
-	return post, nil
+	return nil, apperror.PostNotFoundError
 }
 
 // DeletePost 委托仓库删除(含级联软删评论)。

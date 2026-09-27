@@ -68,6 +68,7 @@ async function fetchList() {
 }
 
 async function handleRecover(postId) {
+  if (!window.confirm("确定恢复该帖子？恢复后帖子回到删除前的状态（评论不会一并恢复）。")) return;
   try {
     await recoverPost(postId);
     toast.success("已恢复（评论不会一并恢复）");

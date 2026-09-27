@@ -22,7 +22,12 @@ COPY . .
 
 # CGO_ENABLED=0：本项目依赖均为纯 Go（gin / gorm / go-sql-driver 等），可静态编译，
 # 运行阶段用 alpine 也无需 libc 兼容层；-s -w 去掉符号表与调试信息以减小体积。
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/laf .
+# 低内存机器（1~2G）构建防护：
+#  -p 2 限制并行编译包数；GOMAXPROCS=2 限制编译并行度；
+#  GOMEMLIMIT=700MiB + GOGC=50 强制工具链（含最后的链接阶段）勤 GC，用 CPU 换内存，
+#  否则包编译通过后单进程链接仍会瞬间吃光内存导致整机换页假死（1.7G 机器实测 wa 91%）。
+#  另需宿主机配备 ≥4G swap 作兜底。
+RUN CGO_ENABLED=0 GOOS=linux GOMAXPROCS=2 GOMEMLIMIT=700MiB GOGC=50 go build -p 2 -trimpath -ldflags="-s -w" -o /out/laf .
 
 # ---- 运行阶段 ----
 FROM alpine:3.20

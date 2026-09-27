@@ -1,12 +1,15 @@
 <!--
-  待审批：帖子发布 + 注销申诉 的待办列表（GET /admin/reviews）。
-  可按类型筛选（post / appeal）；帖子可直接通过/驳回，申诉引导去申诉审核页。
+  待审批：
+  - mainadmin：GET /admin/reviews，帖子发布 + 注销申诉待办，可按类型筛选。
+  - postadmin：无权访问 /admin/reviews，改用 GET /posts?status=pending 看待审核帖子。
+  帖子可直接通过/驳回，申诉仅 mainadmin 可处理。
 -->
 <template>
   <div>
     <div class="row-between">
       <h2>待审批</h2>
-      <div class="row">
+      <!-- 申诉筛选仅 mainadmin 需要；postadmin 只有帖子审核 -->
+      <div v-if="auth.isMainAdmin" class="row">
         <button
           v-for="opt in typeOptions"
           :key="opt.value"
@@ -47,10 +50,17 @@
             </div>
           </li>
         </ul>
+        <Pagination
+          v-if="!auth.isMainAdmin"
+          :page="page"
+          :page-size="pageSize"
+          :total="total"
+          @change="onPageChange"
+        />
       </div>
 
       <!-- 待处理申诉（仅 mainadmin 可处理） -->
-      <div v-if="showAppeals" class="card">
+      <div v-if="auth.isMainAdmin && showAppeals" class="card">
         <h3>待处理申诉（{{ appeals.length }}）</h3>
         <EmptyState v-if="appeals.length === 0" text="没有待处理申诉" icon="✅" />
         <ul v-else class="review-list">
@@ -80,19 +90,25 @@
 <script setup>
 import { onMounted, ref } from "vue";
 import { listReviews, reviewAppeal } from "@/api/admin";
-import { reviewPost } from "@/api/post";
+import { listPosts, reviewPost } from "@/api/post";
 import { useAuthStore } from "@/stores/auth";
 import { useToastStore } from "@/stores/toast";
 import StatusBadge from "@/components/StatusBadge.vue";
 import EmptyState from "@/components/EmptyState.vue";
+import Pagination from "@/components/Pagination.vue";
 
 const auth = useAuthStore();
 const toast = useToastStore();
 
-const type = ref(""); // '' | 'post' | 'appeal'
+const type = ref(""); // '' | 'post' | 'appeal'（仅 mainadmin 用）
 const posts = ref([]);
 const appeals = ref([]);
 const loading = ref(false);
+
+// postadmin 走 /posts?status=pending 的分页参数。
+const page = ref(1);
+const pageSize = ref(20);
+const total = ref(0);
 
 const typeOptions = [
   { value: "", label: "全部" },
@@ -116,16 +132,34 @@ function reasonLabel(r) {
   return { self_regret: "自行注销反悔", wrongful_ban: "被误封请求撤回", other: "其他" }[r] || r;
 }
 
+// postadmin 没有 /admin/reviews 权限，用公开帖子列表接口取 pending 数据。
+async function fetchPendingPosts() {
+  const data = await listPosts({
+    status: ["pending"],
+    page: page.value,
+    page_size: pageSize.value,
+  });
+  posts.value = data.list || [];
+  total.value = data.total || 0;
+  appeals.value = [];
+  showPosts.value = true;
+  showAppeals.value = false;
+}
+
 async function fetchReviews() {
   loading.value = true;
   try {
-    const params = type.value ? { type: type.value } : {};
-    const data = await listReviews(params);
-    // 按类型过滤时后端只填充对应数组，未返回的按空数组处理。
-    posts.value = data.posts || [];
-    appeals.value = data.appeals || [];
-    showPosts.value = !type.value || type.value === "post";
-    showAppeals.value = !type.value || type.value === "appeal";
+    if (!auth.isMainAdmin) {
+      await fetchPendingPosts();
+    } else {
+      const params = type.value ? { type: type.value } : {};
+      const data = await listReviews(params);
+      // 按类型过滤时后端只填充对应数组，未返回的按空数组处理。
+      posts.value = data.posts || [];
+      appeals.value = data.appeals || [];
+      showPosts.value = !type.value || type.value === "post";
+      showAppeals.value = !type.value || type.value === "appeal";
+    }
   } catch (e) {
     toast.error(e?.msg || "加载失败");
   } finally {
@@ -135,6 +169,11 @@ async function fetchReviews() {
 
 function setType(t) {
   type.value = t;
+  fetchReviews();
+}
+
+function onPageChange(p) {
+  page.value = p;
   fetchReviews();
 }
 

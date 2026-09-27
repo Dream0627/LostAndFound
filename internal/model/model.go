@@ -114,14 +114,21 @@ type Conversation struct {
 	CreatedAt   time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);comment:创建时间" json:"created_at"`
 	UpdatedAt   time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at"`
+
+	// 以下为非表字段(gorm:"-")，由服务层按 PostID 回填帖子快照，
+	// 供前端会话列表/聊天页直接展示标题、判断完成状态，无需再单独请求帖子详情。
+	PostTitle    string `gorm:"-" json:"post_title"`
+	PostStatus   string `gorm:"-" json:"post_status"`
+	PostFinished bool   `gorm:"-" json:"post_is_finished"`
 }
 
 // Message 对应对话消息表。
 // ConversationID 关联所属对话，SenderID 是发送者；Content 为消息正文。
+// SenderID 为可空指针：普通消息指向发送用户，系统消息(完成申请留痕)为 NULL。
 type Message struct {
 	ID             uint64         `gorm:"primaryKey;autoIncrement;comment:消息ID" json:"id"`
 	ConversationID uint64         `gorm:"column:conversation_id;not null;index;comment:所属对话ID" json:"conversation_id"`
-	SenderID       uint64         `gorm:"column:sender_id;not null;index;comment:发送者ID" json:"sender_id"`
+	SenderID       *uint64        `gorm:"column:sender_id;index;comment:发送者ID(系统消息为NULL)" json:"sender_id"`
 	Content        string         `gorm:"column:content;type:varchar(1000);not null;comment:消息内容" json:"content"`
 	CreatedAt      time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);comment:创建时间" json:"created_at"`
 	UpdatedAt      time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`

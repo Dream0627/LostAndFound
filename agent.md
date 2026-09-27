@@ -120,6 +120,7 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 | 方法 | 路径 | handler |
 |------|------|---------|
 | GET | `` | `conversation.List` |
+| GET | `/:conversation_id` | `conversation.Get`（会话详情，回填帖子快照） |
 | GET | `/:conversation_id/messages` | `conversation.ListMessages` |
 | POST | `/:conversation_id/messages` | `conversation.SendMessage` |
 | POST | `/:conversation_id/finish-requests` | `conversation.Finish` |
@@ -142,6 +143,9 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 - 列表重复参数（如帖子 type）用 `c.QueryArray("type")`；前端 axios 已自定义 `paramsSerializer` 序列化成 `type=lost&type=found`。
 - 列表/详情常用 `middleware.OptionalAuth`：带 token 时注入身份，不带则匿名。
 - 帖子列表排序：`is_finished asc, id desc`（未完成优先，新帖在前）。
+- 帖子详情可见性（`PostService.GetVisiblePost(postID, userID, role)`）：管理员可见任意状态；**作者本人可见自己任意状态的帖子**；其他人仅见 `approved`，不可见统一返回“帖子不存在”。
+- 会话对象的 `PostTitle/PostStatus/PostFinished` 为 `gorm:"-"` 非表字段，由 `ConversationService.fillPostSnapshot` 按 `post_id` 实时回填（列表与详情均回填），不落库、不写迁移。
+- 完成申请的发起/同意/拒绝/撤回会写入系统消息：`Message.SenderID` 为 `*uint64` 指针，系统消息写 NULL（`messages.sender_id` 可空，有指向 users 的外键，不能写 0）；写入失败被忽略、不阻断主流程。
 
 ---
 
