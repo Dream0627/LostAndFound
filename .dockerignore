@@ -8,6 +8,10 @@ frontend-demo
 
 # 真实配置不打进镜像（由挂载注入，避免密钥泄露）。
 config/config.yaml
+config/config.docker.yaml
+
+# docker compose 口令文件，仅宿主机读取，绝不进入镜像。
+.env
 
 # 运行期生成物（由数据卷接管）。
 uploads

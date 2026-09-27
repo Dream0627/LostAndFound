@@ -1,7 +1,9 @@
 # LAF 前后端分离部署编排：MySQL + 后端 API + 前端(Nginx)。
 # 使用前：
-#   1) 把 config/config.docker.yaml 的 jwt.secret 改成随机串(图片已改用相对路径，无需再配 public_base_url)。
-#   2) 前后端分端口部署时，把前端来源(如 http://公网IP:5173)填进 config/config.docker.yaml 的
+#   1) 复制 .env.example 为 .env，填入 MySQL 口令（compose 会自动读取同目录 .env；该文件已 gitignore）。
+#   2) 把 config/config.docker.yaml 的 jwt.secret 改成随机串(图片已改用相对路径，无需再配 public_base_url)；
+#      其中 database.password 必须与 .env 的 MYSQL_PASSWORD 一致。
+#   3) 前后端分端口部署时，把前端来源(如 http://公网IP:5173)填进 config/config.docker.yaml 的
 #      server.cors_allow_origins，否则浏览器会拦截跨域请求。
 # 在线构建：docker compose up -d --build
 # 停止：docker compose down        （加 -v 会连同数据卷一起删除）
@@ -14,10 +16,11 @@ services:
     container_name: laf-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root123456
-      MYSQL_DATABASE: laf_db
-      MYSQL_USER: laf
-      MYSQL_PASSWORD: laf123456
+      # 口令来自 .env（禁止把真实口令写进本文件并提交）。
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 .env 中设置 MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-laf_db}
+      MYSQL_USER: ${MYSQL_USER:-laf}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在 .env 中设置 MYSQL_PASSWORD}
       TZ: Asia/Shanghai
     command:
       - --character-set-server=utf8mb4
@@ -27,7 +30,8 @@ services:
       # 首次启动（数据卷为空）时自动执行建表脚本。
       - ./migrations/tables.sql:/docker-entrypoint-initdb.d/01_tables.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot123456"]
+      # 用 CMD-SHELL 展开容器内的 MYSQL_ROOT_PASSWORD，避免口令出现在编排文件里。
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\""]
       interval: 5s
       timeout: 5s
       retries: 30

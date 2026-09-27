@@ -68,6 +68,20 @@ fi
 [ -f "$CFG" ] || { err "缺少 $CFG"; exit 1; }
 [ -f "$COMPOSE_FILE" ] || { err "缺少 $COMPOSE_FILE"; exit 1; }
 
+# .env 保存 MySQL 口令（compose 用 ${MYSQL_*} 注入），不提交 git。
+ENV_FILE=".env"
+if [ ! -f "$ENV_FILE" ]; then
+  if [ -f ".env.example" ]; then
+    cp .env.example "$ENV_FILE"
+    warn "未找到 .env，已从 .env.example 生成一份。"
+    warn "请编辑 $ENV_FILE 填入强口令，并保证 MYSQL_PASSWORD 与 $CFG 的 database.password 一致；"
+    warn "若 MySQL 数据卷已初始化过，新口令不会自动生效，需与旧口令保持一致或手动改密。"
+    [ "$ASSUME_YES" = "1" ] || ask "已了解，继续使用当前 .env 部署？" || exit 1
+  else
+    err "缺少 .env 与 .env.example：docker compose 需要 MYSQL_ROOT_PASSWORD / MYSQL_PASSWORD"; exit 1
+  fi
+fi
+
 # ---- 2. 推断对外地址 ------------------------------------------------------
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-}"
 if [ -z "$PUBLIC_BASE_URL" ]; then

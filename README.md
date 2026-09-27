@@ -28,13 +28,14 @@
 - `.dockerignore`：排除 `.git`、`frontend-demo`、真实配置与 `uploads`，缩小构建上下文。
 
 **步骤**：
-1. 编辑 `config/config.yaml`，把 `database.host` 改成 `mysql`（compose 里的服务名），其余按需调整。
-2. 构建并启动：
+1. 复制 `.env.example` 为 `.env` 并填入 MySQL 口令（compose 自动读取；`.env` 已 gitignore，不会提交）；口令需与配置文件中的 `database.password` 一致。
+2. 编辑 `config/config.yaml`，把 `database.host` 改成 `mysql`（compose 里的服务名），其余按需调整。
+3. 构建并启动：
    ```bash
    docker compose up -d --build
    ```
-3. 访问 `http://localhost:8080`；MySQL 首次启动会自动执行 `migrations/tables.sql` 建表。
-4. 停止：`docker compose down`（加 `-v` 会连同数据卷一起删除）。
+4. 访问 `http://localhost:8080`；MySQL 首次启动会自动执行 `migrations/tables.sql` 建表。
+5. 停止：`docker compose down`（加 `-v` 会连同数据卷一起删除）。
 
 **说明**：
 - 真实的 `config/config.yaml` **不会打进镜像**（由 compose 以只读挂载注入），避免密钥入库；镜像内只保留 `config.example.yaml` 作模板。

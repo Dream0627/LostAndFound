@@ -273,10 +273,11 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 
 **服务器更新流程**（详见 `DEPLOY.md`）：
 1. 服务器拉取/覆盖最新代码。
-2. **一次性修正历史图片数据**（把写死主机的绝对地址改回相对路径）：
+2. **一次性修正历史图片数据**（把写死主机的绝对地址改回相对路径；口令从 `.env` / `config.docker.yaml` 获取，不要写进文档或提交）：
    ```bash
-   docker exec -i laf-mysql mysql -uroot -proot123456 laf_db -e \
-   "UPDATE posts SET image_url=CONCAT('/uploads/',SUBSTRING_INDEX(image_url,'/uploads/',-1)) WHERE image_url LIKE '%/uploads/%';"
+   docker exec -i laf-mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" laf_db' <<'SQL'
+   UPDATE posts SET image_url=CONCAT('/uploads/',SUBSTRING_INDEX(image_url,'/uploads/',-1)) WHERE image_url LIKE '%/uploads/%';
+   SQL
    ```
 3. 重建启动：`docker compose up -d --build`（数据卷与 uploads 卷保留，不丢数据）。
 4. 验证：`http://<公网IP>:8080/api/v1/geo/locations` 返回 200；`docker compose logs -f backend`。

@@ -28,14 +28,17 @@ server:
 | `frontend-demo/Dockerfile` | 临时前端镜像（Node 构建 + Nginx 托管） |
 | `frontend-demo/nginx.conf` | SPA 回退 + `/api`、`/uploads` 反代 |
 | `config/config.docker.yaml` | 容器用配置（`database.host=mysql` + `cors_allow_origins`） |
-| `docker-compose.yml` | 三服务编排（mysql + backend + frontend） |
+| `.env.example` → `.env` | MySQL 口令（compose 自动读取；`.env` 已 gitignore，不上传公开仓库） |
+| `docker-compose.yml` | 三服务编排（mysql + backend + frontend），口令通过 `${MYSQL_*}` 注入 |
 | `migrations/tables.sql` | 首次启动自动建表 |
 | `deploy.sh` | 服务器端一键部署脚本（自动装 Docker / 加 swap / 写配置 / 健康检查） |
 
 ## 四、一键部署（推荐）
 ```bash
 cd /opt/LAF
-# 先编辑 config/config.docker.yaml：jwt.secret 改随机串，cors_allow_origins 填入前端来源
+# 1) 配置 MySQL 口令（deploy.sh 也会在缺失时自动从模板生成 .env 并提示）：
+cp .env.example .env && vi .env   # MYSQL_PASSWORD 必须与下方 config.docker.yaml 的 database.password 一致
+# 2) 编辑 config/config.docker.yaml：jwt.secret 改随机串，cors_allow_origins 填入前端来源
 bash deploy.sh
 ```
 首次运行若未装 Docker，脚本会询问并自动安装；2G 内存机器会询问是否加 2GB swap。
