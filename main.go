@@ -39,7 +39,7 @@ func main() {
 	}
 
 	port := fmt.Sprintf(":%d", cfg.Server.Port)
-	engine := router.New(db, cfg.JWTConfig, cfg.Server.CORSAllowOrigins, cfg.Server.PostadminSecret, cfg.Server.MainadminSecret) // 组装“仓库 -> 服务 -> 处理器”并注册所有路由
+	engine := router.New(db, cfg.JWTConfig, cfg.Server.PostadminSecret, cfg.Server.MainadminSecret) // 组装“仓库 -> 服务 -> 处理器”并注册所有路由
 	if err := engine.Run(port); err != nil {
 		fmt.Println("start server failed:", err)
 	}

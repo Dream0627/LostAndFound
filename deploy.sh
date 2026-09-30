@@ -133,4 +133,4 @@ done
 log "容器状态："
 $DC -f "$COMPOSE_FILE" ps
 log "完成。后端 API: ${PUBLIC_BASE_URL}:${BACKEND_PORT}  临时前端: ${PUBLIC_BASE_URL}:${FRONTEND_PORT}"
-log "提醒：若启用 5173 正式前端，请把 ${PUBLIC_BASE_URL}:5173 加入 ${CFG} 的 server.cors_allow_origins 并重启后端。"
+log "提醒：正式前端若部署在另一台服务器，请在其 Nginx 反代 /api、/uploads 到 ${PUBLIC_BASE_URL}:${BACKEND_PORT}（后端无 CORS，前端不能直连后端）。"

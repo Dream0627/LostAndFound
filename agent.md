@@ -210,8 +210,8 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 6. **图片只存相对路径**：`internal/handler/post/create.go` 存成 `/uploads/posts/xxx.png`，**不再写死主机**（历史遗留的 `server.public_base_url` / `buildPublicImageURL` 已移除）。同源访问由后端 `engine.Static("/uploads", "./uploads")` 与前端 Nginx `/uploads/` 反代提供。前端 `src/utils/image.js` 的 `resolveImageUrl` 会把历史绝对地址归一成 `/uploads/...`。
 7. **图片上传仍无大小/MIME 限制**：保存于 `./uploads/posts/`；上生产前建议补白名单与大小限制。
 8. **`gofmt -l` 全仓报错属既有现象**（CRLF / 既有格式），不要据此判断代码损坏。
-9. **热点函数签名（改前必查调用点）**：`router.New(db, jwtConfig, corsAllowOrigins, postadminSecret, mainadminSecret)`、`service.NewUserService(repository, jwtConfig, postadminSecret, mainadminSecret)`、`repository.FillXxx`、`service.PageResult[T]` 的使用。
-10. **CORS**：`internal/middleware/cors.go` 按配置 `server.cors_allow_origins` 白名单回跨域头并处理 OPTIONS 预检；注册在最外层。同源部署（Nginx 反代）留空即可。
+9. **热点函数签名（改前必查调用点）**：`router.New(db, jwtConfig, postadminSecret, mainadminSecret)`、`service.NewUserService(repository, jwtConfig, postadminSecret, mainadminSecret)`、`repository.FillXxx`、`service.PageResult[T]` 的使用。
+10. **CORS 已移除**：后端不再内置 CORS 中间件（`internal/middleware/cors.go` 已删），前端必须经 Nginx 反代 `/api`、`/uploads` 同源访问后端；浏览器直连后端地址的跨域请求会被拦截。
 11. **文档同步约定**：修改功能时须同步更新根 `README.md`（后端 API 文档）、`frontend-demo/README.md`（给前端同学的示例文档，与后端文档分开）与本文件；真实密钥/暗号/IP 等隐私内容不进公开仓库，由后端私发给前端。
 
 ---
@@ -223,7 +223,7 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 > ⚠️ `jwt` / `database` 在启动时已注入各服务，**热更新不生效，需重启**（代码里有对应提示打印）。
 
 结构体字段：
-- `server`: `port`(int) / `cors_allow_origins`([]string) / `postadmin_secret` / `mainadmin_secret`
+- `server`: `port`(int) / `postadmin_secret` / `mainadmin_secret`
 - `database`: `enabled`(bool) / `host` / `port` / `username` / `password` / `name`
 - `jwt`: `secret` / `expires`(int64, 秒) / `issuer`
 
@@ -267,7 +267,7 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 
 ## 13. 部署（在线更新）
 
-**形态**：前后端分端口部署。后端 `8080` 直接对外提供 API 与 `/uploads` 图片；临时前端 `9090`（容器内 Nginx 同源反代后端）；正式前端由前端同学部署到 `5173`，跨域调用后端（来源须加入 `config/config.docker.yaml` 的 `server.cors_allow_origins`）。MySQL 仅容器内网可达。三服务编排见 `docker-compose.yml`（mysql + backend + frontend）。
+**形态**：前后端分服务器部署。后端 `8080` 直接对外提供 API 与 `/uploads` 图片（**无 CORS**）；临时前端 `9090`（容器内 Nginx 同源反代后端）；正式前端由前端同学部署到前端服务器，Nginx 将 `/api`、`/uploads` 反代到后端。MySQL 仅容器内网可达。三服务编排见 `docker-compose.yml`（mysql + backend + frontend）。
 
 **相关文件**：`Dockerfile`（后端多阶段构建）、`frontend-demo/Dockerfile` + `nginx.conf`、`config/config.docker.yaml`、`docker-compose.yml`、`deploy.sh`（服务器一键部署）、`migrations/tables.sql`（首次启动自动建表）。
 

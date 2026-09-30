@@ -10,13 +10,9 @@ import (
 	"github.com/spf13/viper"
 )
 
-// ServerConfig 对应 YAML 的 server 段：监听端口与跨域白名单。
+// ServerConfig 对应 YAML 的 server 段：监听端口与两类管理员暗号。
 type ServerConfig struct {
 	Port int `mapstructure:"port"`
-	// CORSAllowOrigins 是允许跨域访问后端的前端来源列表。
-	// 前后端分离部署(如前端在 5173)时填写，如 "http://公网IP:5173"；
-	// 同源部署(前端 Nginx 反代)时留空即可。
-	CORSAllowOrigins []string `mapstructure:"cors_allow_origins"`
 	// PostadminSecret / MainadminSecret 分别是注册帖子管理员/超级管理员时需要出示的暗号；
 	// 为空则禁止注册对应角色的管理员。两个暗号分开设置，防止持有一个暗号越权注册另一种管理员。
 	PostadminSecret string `mapstructure:"postadmin_secret"`

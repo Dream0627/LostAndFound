@@ -3,12 +3,11 @@
 #   1) 复制 .env.example 为 .env，填入 MySQL 口令（compose 会自动读取同目录 .env；该文件已 gitignore）。
 #   2) 把 config/config.docker.yaml 的 jwt.secret 改成随机串(图片已改用相对路径，无需再配 public_base_url)；
 #      其中 database.password 必须与 .env 的 MYSQL_PASSWORD 一致。
-#   3) 前后端分端口部署时，把前端来源(如 http://公网IP:5173)填进 config/config.docker.yaml 的
-#      server.cors_allow_origins，否则浏览器会拦截跨域请求。
+#   3) 正式前端若部署在另一台服务器：由该服务器 Nginx 反代 /api、/uploads 到后端（后端无 CORS，浏览器直连会被拦截）。
 # 在线构建：docker compose up -d --build
 # 停止：docker compose down        （加 -v 会连同数据卷一起删除）
 # 端口规划：
-#   8080 -> 后端 API（直接对外，供 5173 前端跨域调用；/uploads 图片也在此端口）
+#   8080 -> 后端 API（直接对外，供前端服务器 Nginx 反代访问；/uploads 图片也在此端口）
 #   9090 -> 临时前端 frontend-demo（容器内 Nginx 同源反代后端，之后由正式前端替换）
 services:
   mysql:
@@ -49,7 +48,7 @@ services:
     environment:
       TZ: Asia/Shanghai
     # 前后端分离：后端直接映射到宿主机 8080 对外提供 API 与 /uploads 图片，
-    # 供 5173 端口的正式前端跨域调用（须在 config 的 cors_allow_origins 中放行前端来源）。
+    # 由前端服务器 Nginx 反代访问（后端无 CORS，浏览器直连会被拦截）。
     ports:
       - "8080:8080"
     volumes:

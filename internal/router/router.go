@@ -24,11 +24,10 @@ import (
 	"LAF/internal/service"
 )
 
-// New 构建并返回配置好的 gin.Engine。参数：数据库句柄、JWT 配置、CORS 允许来源、两类管理员暗号。
-func New(db *gorm.DB, jwtConfig config.JWTConfig, corsAllowOrigins []string, postadminSecret, mainadminSecret string) *gin.Engine {
+// New 构建并返回配置好的 gin.Engine。参数：数据库句柄、JWT 配置、两类管理员暗号。
+func New(db *gorm.DB, jwtConfig config.JWTConfig, postadminSecret, mainadminSecret string) *gin.Engine {
 	engine := gin.Default()
-	engine.Use(middleware.CORS(corsAllowOrigins)) // 跨域中间件注册在最外层，保证错误响应也带跨域头
-	engine.Use(middleware.ErrorHandler())         // 注册全局错误处理中间件，统一兜底错误响应
+	engine.Use(middleware.ErrorHandler()) // 注册全局错误处理中间件，统一兜底错误响应
 	engine.Static("/uploads", "./uploads")        // 把本地上传目录映射成静态资源，使图片可通过 /uploads/... 直接访问
 
 	userRepository := repository.NewUserRepository(db)                                                 // 装配阶段：先建仓库

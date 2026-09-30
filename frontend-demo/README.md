@@ -24,7 +24,7 @@ npm run dev        # 打开 http://localhost:5173
 
 ```bash
 VITE_API_BASE_URL=/api/v1      # 走 dev proxy（推荐本地开发）
-# VITE_API_BASE_URL=http://10.0.0.5:8080/api/v1   # 前后端分离且已配置 CORS 时直连
+# 注意：后端已移除 CORS，前端只能保持相对路径（/api/v1），生产由 Nginx 反代到后端；填后端完整地址直连会被浏览器拦截
 ```
 
 ---
