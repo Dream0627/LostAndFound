@@ -133,4 +133,4 @@ done
 log "容器状态："
 $DC -f "$COMPOSE_FILE" ps
 log "完成。后端 API: ${PUBLIC_BASE_URL}:${BACKEND_PORT}  临时前端: ${PUBLIC_BASE_URL}:${FRONTEND_PORT}"
-log "提醒：正式前端若部署在另一台服务器，请在其 Nginx 反代 /api、/uploads 到 ${PUBLIC_BASE_URL}:${BACKEND_PORT}（后端无 CORS，前端不能直连后端）。"
+log "提醒：正式前端若部署在另一台服务器，请在其 Caddy 反代 /api、/uploads 到 ${PUBLIC_BASE_URL}:${BACKEND_PORT}（后端无 CORS，前端不能直连后端）。"

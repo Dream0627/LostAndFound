@@ -1,0 +1,23 @@
+# LAF 前端站点的 Caddy 配置：托管 SPA 静态资源，并同源反代后端接口与上传目录。
+# 同源反代可让浏览器不触发跨域(CORS)，也无需后端额外放开来源。
+:80 {
+	root * /usr/share/caddy
+	encode gzip
+
+	# 帖子图片可能较大，限制单次请求体积为 20MB。
+	request_body {
+		max_size 20MB
+	}
+
+	# 后端 API 与帖子图片：/api/...、/uploads/... 原样转发到后端容器 8080。
+	@backend path /api/* /uploads/*
+	handle @backend {
+		reverse_proxy backend:8080
+	}
+
+	# 前端路由(history 模式)：找不到实体文件时回退到 index.html，避免刷新 404。
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}

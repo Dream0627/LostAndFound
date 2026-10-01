@@ -1,9 +1,9 @@
-# syntax=docker/dockerfile:1
-
 # ============================================================================
 # LAF 前端镜像（前后端分离部署用，多阶段构建）
 # 阶段一用 Node 执行 vite build 产出静态文件；
-# 阶段二用 Nginx 托管 dist，并把 /api、/uploads 反向代理到后端容器。
+# 阶段二用 Caddy 托管 dist，并把 /api、/uploads 反向代理到后端容器。
+# 注意：不写 "# syntax=docker/dockerfile:1" 首行声明——该声明会让 Docker 额外
+# 去拉 docker/dockerfile 镜像，在小内存服务器上常因拉取超时导致构建卡死。
 # ============================================================================
 
 # ---- 构建阶段 ----
@@ -11,7 +11,7 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# 构建期注入后端 API 前缀：Nginx 同源反代，保持相对路径 /api/v1 即可，无需跨域。
+# 构建期注入后端 API 前缀：Caddy 同源反代，保持相对路径 /api/v1 即可，无需跨域。
 ARG VITE_API_BASE_URL=/api/v1
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
@@ -31,12 +31,10 @@ COPY . ./
 RUN npm run build
 
 # ---- 运行阶段 ----
-FROM nginx:1.27-alpine
+FROM caddy:2-alpine
 
-# SPA 静态资源 + 反向代理配置。
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# SPA 静态资源 + 反向代理配置（Caddy 默认以 /etc/caddy/Caddyfile 启动）。
+COPY --from=builder /app/dist /usr/share/caddy
+COPY Caddyfile /etc/caddy/Caddyfile
 
 EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]

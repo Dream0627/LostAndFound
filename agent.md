@@ -207,11 +207,11 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 3. **登录响应字段**：`{ access_token, token_type:"Bearer", expires_in, user }`；`expires_in` 来自 `config.jwt.expires`。
 4. **更新资料响应**：返回 `{ user, posts }`（含该用户帖子），不是裸 user。
 5. **发帖是 `multipart/form-data`**（因含可选图片字段名 `image`），其余多为 JSON。
-6. **图片只存相对路径**：`internal/handler/post/create.go` 存成 `/uploads/posts/xxx.png`，**不再写死主机**（历史遗留的 `server.public_base_url` / `buildPublicImageURL` 已移除）。同源访问由后端 `engine.Static("/uploads", "./uploads")` 与前端 Nginx `/uploads/` 反代提供。前端 `src/utils/image.js` 的 `resolveImageUrl` 会把历史绝对地址归一成 `/uploads/...`。
+6. **图片只存相对路径**：`internal/handler/post/create.go` 存成 `/uploads/posts/xxx.png`，**不再写死主机**（历史遗留的 `server.public_base_url` / `buildPublicImageURL` 已移除）。同源访问由后端 `engine.Static("/uploads", "./uploads")` 与前端 Caddy `/uploads/` 反代提供。前端 `src/utils/image.js` 的 `resolveImageUrl` 会把历史绝对地址归一成 `/uploads/...`。
 7. **图片上传仍无大小/MIME 限制**：保存于 `./uploads/posts/`；上生产前建议补白名单与大小限制。
 8. **`gofmt -l` 全仓报错属既有现象**（CRLF / 既有格式），不要据此判断代码损坏。
 9. **热点函数签名（改前必查调用点）**：`router.New(db, jwtConfig, postadminSecret, mainadminSecret)`、`service.NewUserService(repository, jwtConfig, postadminSecret, mainadminSecret)`、`repository.FillXxx`、`service.PageResult[T]` 的使用。
-10. **CORS 已移除**：后端不再内置 CORS 中间件（`internal/middleware/cors.go` 已删），前端必须经 Nginx 反代 `/api`、`/uploads` 同源访问后端；浏览器直连后端地址的跨域请求会被拦截。
+10. **CORS 已移除**：后端不再内置 CORS 中间件（`internal/middleware/cors.go` 已删），前端必须经 Caddy 反代 `/api`、`/uploads` 同源访问后端；浏览器直连后端地址的跨域请求会被拦截。
 11. **文档同步约定**：修改功能时须同步更新根 `README.md`（后端 API 文档）、`frontend-demo/README.md`（给前端同学的示例文档，与后端文档分开）与本文件；真实密钥/暗号/IP 等隐私内容不进公开仓库，由后端私发给前端。
 
 ---
@@ -261,15 +261,15 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 - 统一响应拦截在 `src/api/http.js`：`code===0` 取 `data`，否则抛错；请求拦截自动注入 `Authorization: Bearer <token>`。
 - 图片地址归一：`src/utils/image.js` 的 `resolveImageUrl`。
 - 视图：`views/` 下含帖子列表/详情/发布、登录/注册、个人资料、申诉、对话/聊天、404，以及 `views/admin/`（Reviews/Appeals/Users/DeletedPosts）。
-- 构建：`npm install && npm run build`；容器内由 Nginx 托管（`frontend-demo/nginx.conf` 做 SPA 回退 + `/api`、`/uploads` 同源反代到 `backend:8080`）。
+- 构建：`npm install && npm run build`；容器内由 Caddy 托管（`frontend-demo/Caddyfile` 做 SPA 回退 + `/api`、`/uploads` 同源反代到 `backend:8080`）。
 
 ---
 
 ## 13. 部署（在线更新）
 
-**形态**：前后端分服务器部署。后端 `8080` 直接对外提供 API 与 `/uploads` 图片（**无 CORS**）；临时前端 `9090`（容器内 Nginx 同源反代后端）；正式前端由前端同学部署到前端服务器，Nginx 将 `/api`、`/uploads` 反代到后端。MySQL 仅容器内网可达。三服务编排见 `docker-compose.yml`（mysql + backend + frontend）。
+**形态**：前后端分服务器部署。后端 `8080` 直接对外提供 API 与 `/uploads` 图片（**无 CORS**）；临时前端 `9090`（容器内 Caddy 同源反代后端）；正式前端由前端同学部署到前端服务器，Caddy 将 `/api`、`/uploads` 反代到后端。MySQL 仅容器内网可达。三服务编排见 `docker-compose.yml`（mysql + backend + frontend）。
 
-**相关文件**：`Dockerfile`（后端多阶段构建）、`frontend-demo/Dockerfile` + `nginx.conf`、`config/config.docker.yaml`、`docker-compose.yml`、`deploy.sh`（服务器一键部署）、`migrations/tables.sql`（首次启动自动建表）。
+**相关文件**：`Dockerfile`（后端多阶段构建）、`frontend-demo/Dockerfile` + `Caddyfile`、`config/config.docker.yaml`、`docker-compose.yml`、`deploy.sh`（服务器一键部署）、`migrations/tables.sql`（首次启动自动建表）。
 
 **服务器更新流程**（详见 `DEPLOY.md`）：
 1. 服务器拉取/覆盖最新代码。

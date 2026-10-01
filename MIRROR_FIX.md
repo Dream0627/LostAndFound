@@ -56,7 +56,7 @@ docker info
 docker pull mysql:8.0
 docker pull golang:1.26.5-alpine
 docker pull node:20-alpine
-docker pull nginx:1.27-alpine
+docker pull caddy:2-alpine
 docker pull alpine:3.20
 docker compose build
 ```
