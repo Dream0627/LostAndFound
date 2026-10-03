@@ -34,65 +34,63 @@ const (
 	AppealStatusRejected = "rejected"
 )
 
+type BaseModel struct {
+	CreatedAt time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);comment:创建时间" json:"created_at"`
+	UpdatedAt time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at"`
+}
+
 // User 对应用户表。角色 Role 取值：student(学生)、postadmin(帖子管理员)、mainadmin(超级管理员)。
 // 密码以哈希形式保存(PasswordHash)，绝不明文存储；其 json 标签为 "-"，保证哈希不会返回给前端。
 type User struct {
-	ID           uint64         `gorm:"primaryKey;autoIncrement;comment:用户ID" json:"id"`
-	Username     string         `gorm:"column:username;type:varchar(32);unique;not null,comment:学号或管理员工号" json:"username"`
-	Name         string         `gorm:"column:name;type:varchar(32);not null;size:32" json:"name"`
-	PasswordHash string         `gorm:"column:password_hash;type:varchar(255);not null;comment:密码哈希值" json:"-"` // json:"-" 表示序列化时忽略该字段，避免密码哈希泄露
-	Role         string         `gorm:"column:role;type:enum('student','postadmin','mainadmin');not null;default:'student';comment:角色" json:"role"`
-	CreatedAt    time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);comment:创建时间" json:"created_at"`
-	UpdatedAt    time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`
-	DeletedAt    gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at"`
+	BaseModel
+	ID           uint64 `gorm:"column:id;primaryKey;autoIncrement;comment:用户ID" json:"id"`
+	Username     string `gorm:"column:username;type:varchar(32);unique;not null,comment:学号或管理员工号" json:"username"`
+	Name         string `gorm:"column:name;type:varchar(32);not null;size:32" json:"name"`
+	PasswordHash string `gorm:"column:password_hash;type:varchar(255);not null;comment:密码哈希值" json:"-"` // json:"-" 表示序列化时忽略该字段，避免密码哈希泄露
+	Role         string `gorm:"column:role;type:enum('student','postadmin','mainadmin');not null;default:'student';comment:角色" json:"role"`
 }
 
 // Post 对应帖子表(失物/招领)。
 // Type 区分 lost(寻物)与 found(招领)；Status 是审核状态(见上面的常量)；
 // ImageURL 使用指针 *string，因为图片是可选的——NULL 表示“没有图片”，与空字符串语义不同。
 type Post struct {
-	ID         uint64         `gorm:"primaryKey;autoIncrement;comment:帖子ID" json:"id"`
-	UserID     uint64         `gorm:"column:user_id;not null;index;comment:作者ID" json:"user_id"`
-	AuthorName string         `gorm:"-" json:"author_name"` // 作者姓名：非表字段(gorm:"-")，查询后按 user_id 关联用户表回填，仅用于返回给前端
-	Type       string         `gorm:"column:type;type:enum('lost','found');not null;default:'lost';comment:帖子类型" json:"type"`
-	Title      string         `gorm:"column:title;type:varchar(2000);not null" json:"title"`
-	ImageURL   *string        `gorm:"column:image_url;type:varchar(1024);default:null;comment:图片URL" json:"image_url"` // 用指针类型表示“可为空”，NULL 与空字符串含义不同
-	LocationID string `gorm:"column:location_id;type:varchar(64);not null;default:'';comment:校园预设地点ID(冗余快照)" json:"location_id"`
-	LocationName string `gorm:"column:location_name;type:varchar(128);not null;default:'';comment:地点名称快照(冗余,减少前端查询)" json:"location_name"`
-	Supplement string `gorm:"column:supplement;type:varchar(200);not null;default:'';comment:地点补充说明" json:"supplement"`
-	Content    string         `gorm:"column:content;type:varchar(2000);not null" json:"content"`
-	IsFinished bool           `gorm:"column:is_finished;type:bool;default:false" json:"is_finished"`
-	Status     string         `gorm:"column:status;type:enum('pending','approved','rejected');not null;default:'pending';index;comment:审核状态" json:"status"`
-	CreatedAt  time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);index" json:"created_at"`
-	UpdatedAt  time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);index" json:"updated_at"`
-	DeletedAt  gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at"`
+	BaseModel
+	ID           uint64  `gorm:"column:id;primaryKey;autoIncrement;comment:帖子ID" json:"id"`
+	UserID       uint64  `gorm:"column:user_id;not null;index;comment:作者ID" json:"user_id"`
+	AuthorName   string  `gorm:"-" json:"author_name"` // 作者姓名：非表字段(gorm:"-")，查询后按 user_id 关联用户表回填，仅用于返回给前端
+	Type         string  `gorm:"column:type;type:enum('lost','found');not null;default:'lost';comment:帖子类型" json:"type"`
+	Title        string  `gorm:"column:title;type:varchar(2000);not null" json:"title"`
+	ImageURL     *string `gorm:"column:image_url;type:varchar(1024);default:null;comment:图片URL" json:"image_url"` // 用指针类型表示“可为空”，NULL 与空字符串含义不同
+	LocationID   string  `gorm:"column:location_id;type:varchar(64);not null;default:'';comment:校园预设地点ID(冗余快照)" json:"location_id"`
+	LocationName string  `gorm:"column:location_name;type:varchar(128);not null;default:'';comment:地点名称快照(冗余,减少前端查询)" json:"location_name"`
+	Supplement   string  `gorm:"column:supplement;type:varchar(200);not null;default:'';comment:地点补充说明" json:"supplement"`
+	Content      string  `gorm:"column:content;type:varchar(2000);not null" json:"content"`
+	IsFinished   bool    `gorm:"column:is_finished;type:bool;default:false" json:"is_finished"`
+	Status       string  `gorm:"column:status;type:enum('pending','approved','rejected');not null;default:'pending';index;comment:审核状态" json:"status"`
 }
 
 // Comment 对应评论表。PostID 关联所属帖子，UserID 关联评论作者。
 // 没有外键约束(靠应用层保证一致性)，字段上建了索引以加速按帖子查询评论。
 type Comment struct {
-	ID        uint64         `gorm:"primaryKey;autoIncrement;comment:评论ID" json:"id"`
-	PostID    uint64         `gorm:"column:post_id;not null;index;comment:所属帖子ID" json:"post_id"`
-	UserID    uint64         `gorm:"column:user_id;not null;index;comment:评论作者ID" json:"user_id"`
-	AuthorName string         `gorm:"-" json:"author_name"` // 作者姓名：非表字段(gorm:"-")，查询后按 user_id 关联用户表回填，仅用于返回给前端
-	Content   string         `gorm:"column:content;type:varchar(1000);not null;comment:评论内容" json:"content"`
-	CreatedAt time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);comment:创建时间" json:"created_at"`
-	UpdatedAt time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at"`
+	BaseModel
+	ID         uint64 `gorm:"column:id;primaryKey;autoIncrement;comment:评论ID" json:"id"`
+	PostID     uint64 `gorm:"column:post_id;not null;index;comment:所属帖子ID" json:"post_id"`
+	UserID     uint64 `gorm:"column:user_id;not null;index;comment:评论作者ID" json:"user_id"`
+	AuthorName string `gorm:"-" json:"author_name"` // 作者姓名：非表字段(gorm:"-")，查询后按 user_id 关联用户表回填，仅用于返回给前端
+	Content    string `gorm:"column:content;type:varchar(1000);not null;comment:评论内容" json:"content"`
 }
 
 // Appeal 对应申诉表。用户账号被注销(软删除)后无法登录，因此申诉由被注销者以 username 公开提交；
 // 超级管理员审核通过后，系统会据 UserID 自动恢复该账号。
 // Reason 取值见上方常量；Content 是申诉说明；Status 是审核状态(见上方常量)。
 type Appeal struct {
-	ID        uint64         `gorm:"primaryKey;autoIncrement;comment:申诉ID" json:"id"`
-	UserID    uint64         `gorm:"column:user_id;not null;index;comment:申诉人ID" json:"user_id"`
-	Reason    string         `gorm:"column:reason;type:enum('self_regret','wrongful_ban','other');not null;default:'other';comment:申诉原因" json:"reason"`
-	Content   string         `gorm:"column:content;type:varchar(1000);not null;default:'';comment:申诉说明" json:"content"`
-	Status    string         `gorm:"column:status;type:enum('pending','approved','rejected');not null;default:'pending';index;comment:审核状态" json:"status"`
-	CreatedAt time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);comment:创建时间" json:"created_at"`
-	UpdatedAt time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at"`
+	BaseModel
+	ID      uint64 `gorm:"column:id;primaryKey;autoIncrement;comment:申诉ID" json:"id"`
+	UserID  uint64 `gorm:"column:user_id;not null;index;comment:申诉人ID" json:"user_id"`
+	Reason  string `gorm:"column:reason;type:enum('self_regret','wrongful_ban','other');not null;default:'other';comment:申诉原因" json:"reason"`
+	Content string `gorm:"column:content;type:varchar(1000);not null;default:'';comment:申诉说明" json:"content"`
+	Status  string `gorm:"column:status;type:enum('pending','approved','rejected');not null;default:'pending';index;comment:审核状态" json:"status"`
 }
 
 // 完成寻找申请的三种状态：pending 待处理、agreed 已同意、rejected 已拒绝。
@@ -107,14 +105,11 @@ const (
 // 连接发起方(InitiatorID)与帖子作者(OwnerID，冗余存储便于按人查询)。
 // 同一用户对同一帖子只会有一条对话(应用层幂等保证)。
 type Conversation struct {
-	ID          uint64         `gorm:"primaryKey;autoIncrement;comment:对话ID" json:"id"`
-	PostID      uint64         `gorm:"column:post_id;not null;index;comment:所属帖子ID" json:"post_id"`
-	InitiatorID uint64         `gorm:"column:initiator_id;not null;index;comment:发起方(申领/召领人)ID" json:"initiator_id"`
-	OwnerID     uint64         `gorm:"column:owner_id;not null;index;comment:帖子作者ID" json:"owner_id"`
-	CreatedAt   time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);comment:创建时间" json:"created_at"`
-	UpdatedAt   time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`
-	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at"`
-
+	BaseModel
+	ID          uint64 `gorm:"column:id;primaryKey;autoIncrement;comment:对话ID" json:"id"`
+	PostID      uint64 `gorm:"column:post_id;not null;index;comment:所属帖子ID" json:"post_id"`
+	InitiatorID uint64 `gorm:"column:initiator_id;not null;index;comment:发起方(申领/召领人)ID" json:"initiator_id"`
+	OwnerID     uint64 `gorm:"column:owner_id;not null;index;comment:帖子作者ID" json:"owner_id"`
 	// 以下为非表字段(gorm:"-")，由服务层按 PostID 回填帖子快照，
 	// 供前端会话列表/聊天页直接展示标题、判断完成状态，无需再单独请求帖子详情。
 	PostTitle    string `gorm:"-" json:"post_title"`
@@ -126,23 +121,28 @@ type Conversation struct {
 // ConversationID 关联所属对话，SenderID 是发送者；Content 为消息正文。
 // SenderID 为可空指针：普通消息指向发送用户，系统消息(完成申请留痕)为 NULL。
 type Message struct {
-	ID             uint64         `gorm:"primaryKey;autoIncrement;comment:消息ID" json:"id"`
-	ConversationID uint64         `gorm:"column:conversation_id;not null;index;comment:所属对话ID" json:"conversation_id"`
-	SenderID       *uint64        `gorm:"column:sender_id;index;comment:发送者ID(系统消息为NULL)" json:"sender_id"`
-	Content        string         `gorm:"column:content;type:varchar(1000);not null;comment:消息内容" json:"content"`
-	CreatedAt      time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);comment:创建时间" json:"created_at"`
-	UpdatedAt      time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`
-	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at"`
+	BaseModel
+	ID             uint64  `gorm:"column:id;primaryKey;autoIncrement;comment:消息ID" json:"id"`
+	ConversationID uint64  `gorm:"column:conversation_id;not null;index;comment:所属对话ID" json:"conversation_id"`
+	SenderID       *uint64 `gorm:"column:sender_id;index;comment:发送者ID(系统消息为NULL)" json:"sender_id"`
+	Content        string  `gorm:"column:content;type:varchar(1000);not null;comment:消息内容" json:"content"`
 }
 
 // FinishRequest 对应“完成寻找申请”表。
 // 对话任一方可发起；另一方处理(agreed/rejected)。同意后对应帖子被置为已完成(is_finished=true)。
 type FinishRequest struct {
-	ID             uint64         `gorm:"primaryKey;autoIncrement;comment:完成申请ID" json:"id"`
-	ConversationID uint64         `gorm:"column:conversation_id;not null;index;comment:所属对话ID" json:"conversation_id"`
-	RequesterID    uint64         `gorm:"column:requester_id;not null;index;comment:发起人ID" json:"requester_id"`
-	Status         string         `gorm:"column:status;type:enum('pending','agreed','rejected');not null;default:'pending';index;comment:申请状态" json:"status"`
-	CreatedAt      time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);comment:创建时间" json:"created_at"`
-	UpdatedAt      time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`
-	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at"`
+	BaseModel
+	ID             uint64 `gorm:"column:id;primaryKey;autoIncrement;comment:完成申请ID" json:"id"`
+	ConversationID uint64 `gorm:"column:conversation_id;not null;index;comment:所属对话ID" json:"conversation_id"`
+	RequesterID    uint64 `gorm:"column:requester_id;not null;index;comment:发起人ID" json:"requester_id"`
+	Status         string `gorm:"column:status;type:enum('pending','agreed','rejected');not null;default:'pending';index;comment:申请状态" json:"status"`
+}
+
+type Announcement struct {
+	BaseModel
+	ID         uint64 `gorm:"column:id;primaryKey;autoIncrement;comment:公告ID" json:"id"`
+	AdminID    uint64 `gorm:"column:admin_id;not null;index;comment:发布管理员ID" json:"admin_id"`
+	AuthorName string `gorm:"-" json:"author_name"` // 作者姓名：非表字段(gorm:"-")，查询后按 user_id 关联用户表回填，仅用于返回给前端
+	Title      string `gorm:"column:title;type:varchar(200);not null;comment:公告标题" json:"title"`
+	Content    string `gorm:"column:content;type:varchar(2000);not null;comment:公告内容" json:"content"`
 }

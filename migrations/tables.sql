@@ -6,7 +6,7 @@ DROP TABLE IF EXISTS posts;
 
 DROP TABLE IF EXISTS appeals;
 DROP TABLE IF EXISTS users;
-
+DROP TABLE IF EXISTS announcements;
 CREATE TABLE users (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '用户ID',
     username VARCHAR(32) NOT NULL UNIQUE COMMENT '学号或管理员工号',
@@ -159,3 +159,22 @@ CREATE TABLE finish_requests (
         FOREIGN KEY (requester_id) REFERENCES users(id)
         ON UPDATE RESTRICT ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='完成寻找申请表';
+
+
+CREATE TABLE announcements (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '公告ID',
+    title VARCHAR(200) NOT NULL COMMENT '公告标题',
+    content VARCHAR(2000) NOT NULL COMMENT '公告内容',
+    admin_id BIGINT UNSIGNED NOT NULL COMMENT '发布管理员ID',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
+    deleted_at DATETIME(3) NULL DEFAULT NULL COMMENT '软删除时间',
+    PRIMARY KEY (id),
+    KEY idx_announcements_created_at (created_at DESC, id DESC),
+    KEY idx_announcements_admin_id (admin_id),
+    CONSTRAINT fk_announcements_admin
+        FOREIGN KEY (admin_id) REFERENCES users(id)
+        ON UPDATE RESTRICT ON DELETE CASCADE,
+    CONSTRAINT chk_announcements_title_not_empty CHECK (CHAR_LENGTH(title) BETWEEN 1 AND 200),
+    CONSTRAINT chk_announcements_content_not_empty CHECK (CHAR_LENGTH(content) BETWEEN 1 AND 2000)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='公告表';

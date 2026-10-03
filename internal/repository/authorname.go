@@ -92,3 +92,25 @@ func (r *CommentRepository) fillCommentAuthorNames(comments []*model.Comment) {
 		}
 	}
 }
+func (r *AnnouncementRepository) fillAnnouncementAuthorNames(announcements []*model.Announcement) {
+	if len(announcements) == 0 {
+		return
+	}
+	ids := make([]uint64, 0, len(announcements))
+	for _, a := range announcements {
+		if a != nil {
+			ids = append(ids, a.AdminID)
+		}
+	}
+	names := loadUserNames(r.db, collectUserIDs(ids))
+	for _, a := range announcements {
+		if a == nil {
+			continue
+		}
+		if name, ok := names[a.AdminID]; ok && name != "" {
+			a.AuthorName = name
+		} else {
+			a.AuthorName = authorNameUnknown
+		}
+	}
+}

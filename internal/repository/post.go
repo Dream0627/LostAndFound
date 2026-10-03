@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	ErrostNotFound    = errors.New("post not found")
+	ErrPostNotFound   = errors.New("post not found")
 	ErrPostNotDeleted = errors.New("post is not deactivated")
 )
 
@@ -89,7 +89,7 @@ func (r *PostRepository) RecoverPost(postID uint64) error {
 	var post model.Post
 	if err := r.db.Unscoped().Where("id = ?", postID).First(&post).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrPostNotFound // 帖子不存在
+			return ErrPostNotFound
 		}
 		return apperror.DatabaseError
 	}
