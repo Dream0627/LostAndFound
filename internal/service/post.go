@@ -2,9 +2,9 @@
 package service
 
 import (
-	//"errors"
+	"errors"
 	//"fmt"
-	
+
 	"strings"
 	//"time"
 	"LAF/internal/model"
@@ -25,26 +25,26 @@ func NewPostService(repository *repository.PostRepository, geoService *GeoServic
 }
 
 // GetPostByID 直连仓库查询未删除帖子，供删除/恢复前做权限判断使用。
-func (s *PostService) GetPostByID(postID uint64) (*model.Post, error) { 
+func (s *PostService) GetPostByID(postID uint64) (*model.Post, error) {
 	return s.repository.GetPostByID(postID)
 }
 
 // GetPostByIDUnscoped 查询“含已软删除”的帖子，用于恢复场景。
-func (s *PostService) GetPostByIDUnscoped(postID uint64) (*model.Post, error) { 
+func (s *PostService) GetPostByIDUnscoped(postID uint64) (*model.Post, error) {
 	return s.repository.GetPostByIDUnscoped(postID)
 }
 
 // CheckpostPermission 判断当前用户是否有权操作(删除/恢复)该帖子。
 // 规则：student 只能操作自己的帖子；postadmin / mainadmin 可操作任意帖子。
-func (s *PostService) CheckpostPermission(userID uint64, role string, post *model.Post) error { 
-	if role == "student" { 
-		if post.UserID == userID { 
+func (s *PostService) CheckpostPermission(userID uint64, role string, post *model.Post) error {
+	if role == "student" {
+		if post.UserID == userID {
 			return nil
 		}
-	} else if role == "postadmin" || role == "mainadmin" { 
+	} else if role == "postadmin" || role == "mainadmin" {
 		return nil
 	}
-    return apperror.UserForbiddenError
+	return apperror.UserForbiddenError
 }
 
 // CreateInput 是“发布帖子”的业务入参 DTO。ImageURL 用指针表示“可选(可为空)”。
@@ -63,10 +63,10 @@ type CreateInput struct {
 }
 
 // Create 发布帖子。核心业务规则：
-//   1) type 只能是 lost / found；
-//   2) 内容去空白后长度需在 1~2000；
-//   3) 审核状态：普通学生发布默认 pending(待审核)，
-//      管理员发布直接 approved(免审核)。
+//  1. type 只能是 lost / found；
+//  2. 内容去空白后长度需在 1~2000；
+//  3. 审核状态：普通学生发布默认 pending(待审核)，
+//     管理员发布直接 approved(免审核)。
 func (s *PostService) Create(input CreateInput, userID uint64, role string) (*model.Post, error) {
 	if input.Type != "lost" && input.Type != "found" {
 		return nil, apperror.ParamError
@@ -189,13 +189,20 @@ func (s *PostService) GetVisiblePost(postID, userID uint64, role string) (*model
 }
 
 // DeletePost 委托仓库删除(含级联软删评论)。
-func (s *PostService) DeletePost(postID uint64) error { 
+func (s *PostService) DeletePost(postID uint64) error {
 	return s.repository.DeletePost(postID)
 }
 
 // RecoverPost 委托仓库恢复被软删除的帖子。
-func (s *PostService) RecoverPost(postID uint64) error { 
-	return s.repository.RecoverPost(postID)
+func (s *PostService) RecoverPost(postID uint64) error {
+	err := s.repository.RecoverPost(postID)
+	if errors.Is(err, repository.ErrPostNotFound) {
+		return apperror.PostNotFoundError
+	}
+	if errors.Is(err, repository.ErrPostNotDeleted) {
+		return apperror.PostNotDeactivatedError
+	}
+	return err
 }
 
 // ensurePostVisible 统一“帖子对当前用户是否可见”的判定。
