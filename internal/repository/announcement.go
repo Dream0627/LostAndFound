@@ -37,12 +37,11 @@ func (r *AnnouncementRepository) Delete(announcementID uint64) error {
 func (r *AnnouncementRepository) GetAnnouncements(limit, offset int) ([]*model.Announcement, int64, error) {
 	var Announcements []*model.Announcement
 	var total int64
-	query := r.db.Model(&model.Announcement{})
 
-	if err := query.Count(&total).Error; err != nil {
+	if err := r.db.Model(&model.Announcement{}).Count(&total).Error; err != nil {
 		return nil, 0, apperror.DatabaseError
 	}
-	if err := query.Order("create_time asc, id desc").Limit(limit).Offset(offset).Find(&Announcements).Error; err != nil {
+	if err := r.db.Model(&model.Announcement{}).Order("created_at desc, id desc").Limit(limit).Offset(offset).Find(&Announcements).Error; err != nil {
 		return nil, 0, apperror.DatabaseError
 	}
 	r.fillAnnouncementAuthorNames(Announcements) // 回填作者姓名(展示用，非表字段)

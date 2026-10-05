@@ -26,7 +26,7 @@ func DeleteAnnouncement(announcementService *service.AnnouncementService) gin.Ha
 		}
 		nowUserRole, _ := middleware.CurrentRole(c)                   // 取当前角色，用于后面的权限判断
 		if nowUserRole != "postadmin" && nowUserRole != "mainadmin" { // 只有管理员可以删除公告
-			apperror.AbortWithException(c, apperror.AdminForbiddenError, nil)
+			apperror.AbortWithError(c, apperror.AdminForbiddenError)
 			return
 		}
 		if err := announcementService.DeleteAnnouncement(announcementID); err != nil {

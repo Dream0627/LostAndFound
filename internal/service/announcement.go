@@ -6,6 +6,7 @@ package service
 
 import (
 	//"errors"
+
 	"strings"
 
 	"LAF/internal/model"
@@ -57,6 +58,7 @@ func (s *AnnouncementService) Create(adminID uint64, input AnnouncementInput) (*
 }
 
 func (s *AnnouncementService) DeleteAnnouncement(announcementID uint64) error {
+	////yaogaig
 	return s.repository.Delete(announcementID)
 }
 
