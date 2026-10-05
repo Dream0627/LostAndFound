@@ -41,8 +41,9 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, postadminSecret, mainadminSecr
 	commentService := service.NewCommentService(commentRepository, postRepository)
 	appealRepository := repository.NewAppealRepository(db)
 	appealService := service.NewAppealService(appealRepository, userRepository)
-	mainAdminService := service.NewMainAdminService(userRepository, postRepository, appealRepository)
-	conversationRepository := repository.NewConversationRepository(db) // 对话模块：仓库
+	statsRepository := repository.NewStatsRepository(db)
+	mainAdminService := service.NewMainAdminService(userRepository, postRepository, appealRepository, statsRepository) // 注入仓库：用户、帖子、申诉、统计
+	conversationRepository := repository.NewConversationRepository(db)                                                 // 对话模块：仓库
 	messageRepository := repository.NewMessageRepository(db)
 	finishRequestRepository := repository.NewFinishRequestRepository(db)
 	conversationService := service.NewConversationService(conversationRepository, messageRepository, finishRequestRepository, postRepository) // 对话/完成寻找服务(复用 postRepository)
@@ -105,6 +106,7 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, postadminSecret, mainadminSecr
 	admin.PATCH("/users/:user_id/recover", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.RecoverUser(mainAdminService))
 	admin.PATCH("/appeals/:appeal_id/review", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.ReviewAppeal(mainAdminService))
 	admin.GET("/reviews", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.ListReviews(mainAdminService))
+	admin.GET("/stats", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.GetStatsHandler(mainAdminService))
 
 	// postadmin := admin.Group("/postadmin")
 

@@ -24,14 +24,16 @@ type MainAdminService struct {
 	userRepository   *repository.UserRepository
 	postRepository   *repository.PostRepository
 	appealRepository *repository.AppealRepository
+	statsRepository  *repository.StatsRepository
 }
 
 // NewMainAdminService 由 router 注入用户、帖子、申诉三个仓库。
-func NewMainAdminService(userRepository *repository.UserRepository, postRepository *repository.PostRepository, appealRepository *repository.AppealRepository) *MainAdminService {
+func NewMainAdminService(userRepository *repository.UserRepository, postRepository *repository.PostRepository, appealRepository *repository.AppealRepository, statsRepository *repository.StatsRepository) *MainAdminService {
 	return &MainAdminService{
 		userRepository:   userRepository,
 		postRepository:   postRepository,
 		appealRepository: appealRepository,
+		statsRepository:  statsRepository,
 	}
 }
 
@@ -143,4 +145,11 @@ func (s *MainAdminService) GetPendingReviews(reviewType string, page, pageSize i
 	}
 
 	return result, nil
+}
+func (s *MainAdminService) GetStats() (*repository.Stats, error) {
+	stats, err := s.statsRepository.GetStats()
+	if err != nil {
+		return nil, err
+	}
+	return &stats, nil
 }
