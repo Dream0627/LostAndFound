@@ -58,7 +58,10 @@ func (s *AnnouncementService) Create(adminID uint64, input AnnouncementInput) (*
 }
 
 func (s *AnnouncementService) DeleteAnnouncement(announcementID uint64) error {
-	////yaogaig
+	_, err := s.repository.GetAnnouncementsByID(announcementID)
+	if err != nil {
+		return err
+	}
 	return s.repository.Delete(announcementID)
 }
 

@@ -34,6 +34,16 @@ func (r *AnnouncementRepository) Delete(announcementID uint64) error {
 	}
 	return nil
 }
+func (r *AnnouncementRepository) GetAnnouncementsByID(announcementsID uint64) (*model.Announcement, error) {
+	var announcement model.Announcement
+	if err := r.db.First(&announcement, announcementsID).Error; err != nil {
+		return nil, apperror.AnnouncementNotFoundError
+	}
+	if !announcement.DeletedAt.Valid {
+		return nil, apperror.AnnouncementNotDeletedError
+	}
+	return &announcement, nil
+}
 func (r *AnnouncementRepository) GetAnnouncements(limit, offset int) ([]*model.Announcement, int64, error) {
 	var Announcements []*model.Announcement
 	var total int64
