@@ -200,7 +200,7 @@ func (s *PostService) RecoverPost(postID uint64) error {
 		return apperror.PostNotFoundError
 	}
 	if errors.Is(err, repository.ErrPostNotDeleted) {
-		return apperror.PostNotDeactivatedError
+		return apperror.PostNotDeletedError
 	}
 	return err
 }

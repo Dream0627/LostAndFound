@@ -19,7 +19,6 @@ type AnnouncementListResult = PageResult[*model.Announcement]
 type AnnouncementInput struct {
 	Title   string
 	Content string
-	AdminID uint64
 }
 
 type AnnouncementService struct {
@@ -36,7 +35,7 @@ func NewAnnouncementService(repository *repository.AnnouncementRepository) *Anno
 // Create 发布公告。核心业务规则：
 //  1. 内容去空白后长度需在 1~2000；
 //  2. 标题去空白后长度需在 1~100；
-func (s *AnnouncementService) Create(input AnnouncementInput, adminID uint64) (*model.Announcement, error) {
+func (s *AnnouncementService) Create(adminID uint64, input AnnouncementInput) (*model.Announcement, error) {
 	input.Content = strings.TrimSpace(input.Content)
 	if len(input.Content) == 0 || len(input.Content) > 2000 {
 		return nil, apperror.ParamError

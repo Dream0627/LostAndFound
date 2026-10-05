@@ -15,7 +15,7 @@ import (
 
 var (
 	ErrPostNotFound   = errors.New("post not found")
-	ErrPostNotDeleted = errors.New("post is not deactivated")
+	ErrPostNotDeleted = errors.New("post is not deleted")
 )
 
 // PostRepository 持有数据库句柄 db，为帖子提供数据访问能力。
