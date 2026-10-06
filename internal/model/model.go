@@ -138,11 +138,14 @@ type FinishRequest struct {
 	Status         string `gorm:"column:status;type:enum('pending','agreed','rejected');not null;default:'pending';index;comment:申请状态" json:"status"`
 }
 
+// Announcement 对应公告表。公告由管理员(postadmin/mainadmin)发布，全站可见。
+// AdminID 关联发布管理员(users.id)；AuthorName 为非表字段(gorm:"-")，
+// 查询后按 admin_id 关联用户表回填，仅用于返回给前端。
 type Announcement struct {
 	BaseModel
 	ID         uint64 `gorm:"column:id;primaryKey;autoIncrement;comment:公告ID" json:"id"`
 	AdminID    uint64 `gorm:"column:admin_id;not null;index;comment:发布管理员ID" json:"admin_id"`
-	AuthorName string `gorm:"-" json:"author_name"` // 作者姓名：非表字段(gorm:"-")，查询后按 user_id 关联用户表回填，仅用于返回给前端
+	AuthorName string `gorm:"-" json:"author_name"` // 发布管理员姓名：非表字段，查询后按 admin_id 回填，仅用于返回给前端
 	Title      string `gorm:"column:title;type:varchar(200);not null;comment:公告标题" json:"title"`
 	Content    string `gorm:"column:content;type:varchar(2000);not null;comment:公告内容" json:"content"`
 }

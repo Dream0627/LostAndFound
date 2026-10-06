@@ -59,7 +59,6 @@ var (
 	UserAlreadyDeactivatedError     = NewError(409, "该用户已处于注销状态")
 	UserNotDeactivatedError         = NewError(409, "该用户未处于注销状态")
 	PostNotDeletedError             = NewError(409, "该帖子未处于软删除状态")
-	AnnouncementNotDeletedError     = NewError(409, "该公告未处于软删除状态")
 	GeoLocationNotFoundError        = NewError(404, "定位地点不存在")
 	InvalidCoordinateError          = NewError(400, "无效的坐标")
 	ConversationNotFoundError       = NewError(404, "对话不存在")

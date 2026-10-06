@@ -270,6 +270,25 @@
 - **查询参数**：`page`（默认 1）、`page_size`（默认 20，上限 100）
 - **响应**：`{ list:[...], total, page, page_size }`
 
+### 3. 发布公告（仅管理员）
+- **接口**：`POST /api/v1/admin/announcements`
+- **鉴权**：需要，角色为 `postadmin` 或 `mainadmin`
+- **用途**：发布一条全站公告。**发布者取自 token**，不接受请求体传入 `admin_id`。
+- **请求体（JSON）**：
+  | 参数 | 类型 | 必传 | 说明 |
+  |------|------|------|------|
+  | `title` | string | 是 | 公告标题，1–200 字符 |
+  | `content` | string | 是 | 公告内容，1–2000 字符 |
+- **响应**：返回创建的公告对象（`id, admin_id, author_name, title, content, created_at`）
+
+### 4. 删除公告（仅管理员）
+- **接口**：`DELETE /api/v1/admin/announcements/:announcement_id`
+- **鉴权**：需要，角色为 `postadmin` 或 `mainadmin`
+- **用途**：软删除公告。
+- **路径参数**：`announcement_id`（uint64，必传）
+- **响应**：`{ "code":0, "msg":"success", "data":null }`
+- **常见错误**：`404 公告不存在`；`400` 路径参数非法
+
 ---
 
 ## 四、评论模块
@@ -371,6 +390,11 @@
   | `page_size` | int | 否 | 默认 20，上限 100 |
 - **响应**：`{ "posts":[...], "appeals":[...] }`（按类型过滤时只填充对应数组）
 - **常见错误**：`400 无效的待审批类型`
+
+### 5. 后台数据计数
+- **接口**：`GET /api/v1/admin/count`
+- **用途**：后台首页概览计数（用户/帖子总数、待审核帖子数、待处理申诉数、今日新增帖子/评论数）。
+- **响应**：`{ "code":0, "msg":"success", "data":{ "user_count":.., "post_count":.., "pending_post_count":.., "pending_appeal_count":.., "today_post_count":.., "today_comment_count":.. } }`
 
 ---
 
@@ -504,6 +528,23 @@
 
 ---
 
+## 九、公告模块（/api/v1/announcements）
+
+### 1. 公告列表（分页）
+- **接口**：`GET /api/v1/announcements`
+- **鉴权**：无需（公开）
+- **用途**：查询全站公告，按发布时间倒序（新公告在前），并回填发布管理员姓名 `author_name`。
+- **查询参数**：
+  | 参数 | 类型 | 必传 | 说明 |
+  |------|------|------|------|
+  | `page` | int | 否 | 默认 1 |
+  | `page_size` | int | 否 | 默认 20，上限 100 |
+- **响应**：`{ list:[...], total, page, page_size }`，元素含 `id, admin_id, author_name, title, content, created_at`
+
+> 公告的**发布 / 删除**为管理员接口，见「三、管理员专用」的 `POST /api/v1/admin/announcements` 与 `DELETE /api/v1/admin/announcements/:announcement_id`。
+
+---
+
 ## 认证与鉴权细节
 
 - **令牌格式**：`Authorization: Bearer <access_token>`（`Bearer` 后必须有一个空格）
@@ -526,11 +567,12 @@
 
 1. **为什么我发的帖子别人看不到？** 学生发帖默认为 `pending`，需管理员审核通过（`approved`）后才会展示。
 2. **如何审核帖子？** 用 `PATCH /api/v1/posts/:post_id/review` 传 `status: "approved"|"rejected"`，每帖仅可审核一次。
-3. **误删了帖子怎么办？** 用 `PATCH /api/v1/posts/:post_id/recover` 恢复（不自动恢复评论）。
+3. **误删了帖子怎么办？** 用 `PATCH /api/v1/posts/:post_id/recover` 恢复；删帖时其下评论会被同批软删除，恢复时会一并恢复「与帖子同批删除（`deleted_at` 相同）」的评论。
 4. **如何删除评论？** 用 `DELETE /api/v1/comments/:comment_id`，普通用户只能删自己的评论。
 5. **列表为何返回空？** 普通用户强制只看 `approved`，无匹配则为空数组。
 6. **token 失效怎么办？** 重新登录获取新 `access_token` 并替换请求头。
 7. **如何注册管理员？** 注册 `postadmin` 或 `mainadmin` 时需在请求体中提供 `admin_secret`，后端按角色校验对应暗号；暗号配在服务器 `config/config.docker.yaml` 的 `postadmin_secret` / `mainadmin_secret` 中，仅管理员知晓。学生注册无需该字段。
+8. **公告怎么发布和查看？** 管理员用 `POST /api/v1/admin/announcements` 发布、`DELETE /api/v1/admin/announcements/:announcement_id` 删除；所有用户（含未登录）用 `GET /api/v1/announcements` 查看列表。
 
 ---
 
@@ -543,8 +585,9 @@
 - **conversations**：`id, post_id, initiator_id, owner_id, created_at, updated_at, deleted_at`；唯一键 `(post_id, initiator_id)`；外键 `post_id → posts(id)`、`initiator_id/owner_id → users(id)`
 - **messages**：`id, conversation_id, sender_id, content, created_at, updated_at, deleted_at`；外键 `conversation_id → conversations(id)`、`sender_id → users(id)`
 - **finish_requests**：`id, conversation_id, requester_id, status(pending/agreed/rejected), created_at, updated_at, deleted_at`；外键 `conversation_id → conversations(id)`、`requester_id → users(id)`
+- **announcements**：`id, title, content, admin_id, created_at, updated_at, deleted_at`；索引 `created_at DESC, id DESC`、`admin_id`；外键 `admin_id → users(id)`（`ON DELETE CASCADE`）
 
 ---
 
-**最后更新**：2026-09-23  
+**最后更新**：2026-10-06  
 **本地路径**：`E:\study\LAF`

@@ -10,8 +10,9 @@ import (
 )
 
 // CreateAnnouncementRequest 是发表公告的请求体结构。
-// json 标签：声明请求体里的字段名(title / content / admin_id)。
-// binding:"required"：Gin 在解析时会校验这三个字段必传，缺失则解析报错。
+// json 标签：声明请求体里的字段名(title / content)。
+// binding:"required"：Gin 在解析时会校验这两个字段必传，缺失则解析报错。
+// 发布者(admin_id)取自登录令牌，不由请求体传入。
 type CreateAnnouncementRequest struct {
 	Title   string `json:"title" binding:"required"`
 	Content string `json:"content" binding:"required"`

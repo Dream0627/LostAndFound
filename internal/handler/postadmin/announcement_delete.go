@@ -12,11 +12,8 @@ import (
 )
 
 // DeleteAnnouncement 是“删除公告”的处理器工厂。
-// 删除公告
-// DeleteAnnouncement 是“删除公告”的处理器工厂。
-// 删除公告
 // 本文件对应“删除公告”接口。
-// 流程：解析路径参数 -> 读取当前用户身份 -> 查公告 -> 校验权限 -> 执行删除。
+// 流程：解析路径参数 -> 读取当前用户身份 -> 校验管理员权限 -> 执行软删除。
 func DeleteAnnouncement(announcementService *service.AnnouncementService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		announcementID, err := strconv.ParseUint(c.Param("announcement_id"), 10, 64) // 把路径里的 announcement_id 从字符串解析成无符号整数(10 进制, 64 位)

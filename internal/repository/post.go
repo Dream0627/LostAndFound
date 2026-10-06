@@ -4,9 +4,8 @@ package repository
 
 import (
 	"errors"
-	//"fmt"
+	"time"
 
-	//"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 
 	"LAF/internal/model"
@@ -70,12 +69,15 @@ func (r *PostRepository) Create(post *model.Post) error {
 // DeletePost 删除帖子，并在同一事务里一并软删除其下所有评论。
 // 为什么要手动删评论？因为软删除只是 UPDATE，不会触发数据库外键级联；
 // 用 Transaction 保证“删评论 + 删帖子”要么都成功、要么都回滚，避免出现半删状态。
+// 为什么要显式指定 deleted_at = now？若让两条 UPDATE 各自取数据库当前时间，可能跨毫秒得到
+// 不同时间戳，导致 RecoverPost 无法用“同批时间戳”精确匹配到评论；统一用同一个 now 规避。
 func (r *PostRepository) DeletePost(postID uint64) error {
+	now := time.Now().Truncate(time.Millisecond) // 截断到毫秒，与数据库 datetime(3) 精度一致
 	err := r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("post_id = ?", postID).Delete(&model.Comment{}).Error; err != nil {
+		if err := tx.Unscoped().Model(&model.Comment{}).Where("post_id = ? AND deleted_at IS NULL", postID).Update("deleted_at", now).Error; err != nil {
 			return err
 		}
-		return tx.Delete(&model.Post{}, postID).Error
+		return tx.Unscoped().Model(&model.Post{}).Where("id = ? AND deleted_at IS NULL", postID).Update("deleted_at", now).Error
 	})
 	if err != nil {
 		return apperror.DatabaseError
@@ -96,7 +98,7 @@ func (r *PostRepository) RecoverPost(postID uint64) error {
 	if !post.DeletedAt.Valid {
 		return ErrPostNotDeleted // 帖子当前是正常状态，无需恢复
 	}
-	batchTime := post.DeletedAt.Time // 帖子原删除时间 = 本次注销批次的时间戳
+	batchTime := post.DeletedAt.Time // 帖子原删除时间 = 本次删除批次的时间戳
 
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Unscoped().Model(&model.Post{}).Where("id = ?", postID).Update("deleted_at", nil).Error; err != nil {

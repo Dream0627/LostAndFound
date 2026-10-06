@@ -1,12 +1,6 @@
-// Package service 是“业务逻辑层”。
-// 职责：做业务规则校验、权限判断，并把“仓库层的领域错误”翻译成“对外业务错误(apperror)”。
-// 它不直接接触 SQL(那是 repository 的事)，也不处理 HTTP(那是 handler 的事)，
-// 这样业务规则集中在一处，便于复用与测试。
 package service
 
 import (
-	//"errors"
-
 	"strings"
 
 	"LAF/internal/model"
@@ -15,8 +9,10 @@ import (
 	"LAF/pkg/pagination"
 )
 
+// AnnouncementListResult 是公告分页列表的返回结构。
 type AnnouncementListResult = PageResult[*model.Announcement]
 
+// AnnouncementInput 是“发表公告”的业务入参 DTO。
 type AnnouncementInput struct {
 	Title   string
 	Content string
@@ -26,7 +22,7 @@ type AnnouncementService struct {
 	repository *repository.AnnouncementRepository
 }
 
-// NewAnnouncementService 由 router 在装配阶段调用，注入两个仓库。
+// NewAnnouncementService 由 router 在装配阶段调用，注入公告仓库。
 func NewAnnouncementService(repository *repository.AnnouncementRepository) *AnnouncementService {
 	return &AnnouncementService{
 		repository: repository,
@@ -34,15 +30,16 @@ func NewAnnouncementService(repository *repository.AnnouncementRepository) *Anno
 }
 
 // Create 发布公告。核心业务规则：
-//  1. 内容去空白后长度需在 1~2000；
-//  2. 标题去空白后长度需在 1~100；
+//  1. 标题去空白后长度需在 1~200；
+//  2. 内容去空白后长度需在 1~2000；
+//  3. 发布者以登录身份(adminID)为准，不信任请求体。
 func (s *AnnouncementService) Create(adminID uint64, input AnnouncementInput) (*model.Announcement, error) {
-	input.Content = strings.TrimSpace(input.Content)
-	if len(input.Content) == 0 || len(input.Content) > 2000 {
+	input.Title = strings.TrimSpace(input.Title)
+	if len(input.Title) == 0 || len(input.Title) > 200 {
 		return nil, apperror.ParamError
 	}
-	input.Title = strings.TrimSpace(input.Title)
-	if len(input.Title) == 0 || len(input.Title) > 100 {
+	input.Content = strings.TrimSpace(input.Content)
+	if len(input.Content) == 0 || len(input.Content) > 2000 {
 		return nil, apperror.ParamError
 	}
 	announcement := &model.Announcement{
@@ -57,14 +54,15 @@ func (s *AnnouncementService) Create(adminID uint64, input AnnouncementInput) (*
 	return announcement, nil
 }
 
+// DeleteAnnouncement 删除公告：先确认公告存在且未删除，再执行软删除。
 func (s *AnnouncementService) DeleteAnnouncement(announcementID uint64) error {
-	_, err := s.repository.GetAnnouncementsByID(announcementID)
-	if err != nil {
+	if _, err := s.repository.GetAnnouncementByID(announcementID); err != nil {
 		return err
 	}
 	return s.repository.Delete(announcementID)
 }
 
+// GetAnnouncements 分页查询公告列表(公开)。
 func (s *AnnouncementService) GetAnnouncements(page, pageSize int) (*AnnouncementListResult, error) {
 	offset := pagination.Offset(page, pageSize)
 	announcements, total, err := s.repository.GetAnnouncements(pageSize, offset)
