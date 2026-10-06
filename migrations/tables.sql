@@ -1,10 +1,17 @@
 USE `laf_db`
 
+DROP TABLE IF EXISTS favorites;
+
+DROP TABLE IF EXISTS announcements;
+
+DROP TABLE IF EXISTS feedbacks;
+
 DROP TABLE IF EXISTS comments;
 
 DROP TABLE IF EXISTS posts;
 
 DROP TABLE IF EXISTS appeals;
+
 DROP TABLE IF EXISTS users;
 
 CREATE TABLE users (
@@ -159,3 +166,61 @@ CREATE TABLE finish_requests (
         FOREIGN KEY (requester_id) REFERENCES users(id)
         ON UPDATE RESTRICT ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='完成寻找申请表';
+
+
+CREATE TABLE announcements (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '公告ID',
+    title VARCHAR(200) NOT NULL COMMENT '公告标题',
+    content VARCHAR(2000) NOT NULL COMMENT '公告内容',
+    admin_id BIGINT UNSIGNED NOT NULL COMMENT '发布管理员ID',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
+    deleted_at DATETIME(3) NULL DEFAULT NULL COMMENT '软删除时间',
+    PRIMARY KEY (id),
+    KEY idx_announcements_created_at (created_at DESC, id DESC),
+    KEY idx_announcements_admin_id (admin_id),
+    CONSTRAINT fk_announcements_admin
+        FOREIGN KEY (admin_id) REFERENCES users(id)
+        ON UPDATE RESTRICT ON DELETE CASCADE,
+    CONSTRAINT chk_announcements_title_not_empty CHECK (CHAR_LENGTH(title) BETWEEN 1 AND 200),
+    CONSTRAINT chk_announcements_content_not_empty CHECK (CHAR_LENGTH(content) BETWEEN 1 AND 2000)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='公告表';
+
+-- 用户反馈表：登录用户提交反馈，超级管理员后台审批(pending -> approved/rejected)。
+CREATE TABLE feedbacks (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '反馈ID',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '提交人ID',
+    content VARCHAR(1000) NOT NULL COMMENT '反馈内容',
+    status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending' COMMENT '审批状态: pending-待处理, approved-已采纳, rejected-已驳回',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
+    deleted_at DATETIME(3) DEFAULT NULL COMMENT '软删除时间',
+    PRIMARY KEY (id),
+    KEY idx_feedbacks_user_id (user_id),
+    KEY idx_feedbacks_status (status),
+    KEY idx_feedbacks_created_at (created_at DESC, id DESC),
+    CONSTRAINT fk_feedbacks_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+        ON UPDATE RESTRICT ON DELETE CASCADE,
+    CONSTRAINT chk_feedbacks_content_not_empty CHECK (CHAR_LENGTH(content) BETWEEN 1 AND 1000)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户反馈表';
+
+-- 收藏帖子表：多对多关系，user_id 收藏 post_id；取消收藏为软删除，恢复收藏时重新插入新行。
+CREATE TABLE favorites (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '收藏ID',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '收藏者ID',
+    post_id BIGINT UNSIGNED NOT NULL COMMENT '被收藏帖子ID',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
+    deleted_at DATETIME(3) DEFAULT NULL COMMENT '软删除时间',
+    PRIMARY KEY (id),
+    KEY idx_favorites_user_id (user_id),
+    KEY idx_favorites_post_id (post_id),
+    KEY idx_favorites_created_at (created_at DESC, id DESC),
+    CONSTRAINT fk_favorites_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+        ON UPDATE RESTRICT ON DELETE CASCADE,
+    CONSTRAINT fk_favorites_post
+        FOREIGN KEY (post_id) REFERENCES posts(id)
+        ON UPDATE RESTRICT ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='收藏帖子表';

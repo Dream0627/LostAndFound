@@ -183,7 +183,7 @@ frontend-demo/
 2. **数组筛选**：帖子类型/状态多选，`paramsSerializer` 保证重复参数形式（`type=lost&type=found`）。
 3. **帖子位置**：`PostCreateView` 复用 `LocationPicker`，拿到地点后提交 `location_id` 或坐标 + `supplement`；列表/详情直接展示后端返回的 `location_name`（冗余快照），无需再查地点接口。
 4. **完成寻找**：`ChatView` 进入时先取会话详情（`getConversation`），以 `post_is_finished` 为准控制入口——帖子已完成时隐藏“发起完成寻找”按钮并展示完成提示，避免“申请同意后按钮重现”的问题；待处理申请横幅中发起方显示“撤回”、另一方显示“同意/拒绝”。完成申请的发起/处理/撤回在聊天记录中以系统消息（`sender_id` 为 `null`，居中灰条）留痕。
-5. **管理员审核**：`PostDetailView`（单帖管理）与 `admin/ReviewsView`（待办工作台）两处入口。待审核/被驳回帖走 `reviewPost`（通过/驳回）；**已通过帖仍可在详情页用 `updatePostStatus` 下架或打回待审**，均带二次确认。
+5. **管理员审核**：`PostDetailView`（单帖管理）与 `admin/ReviewsView`（待办工作台）两处入口。待审核帖走 `reviewPost`（通过/驳回）；已通过帖走 `updatePostStatus` 下架（rejected）、已驳回帖走 `updatePostStatus` 重新通过（approved），均不能改回待审核；管理员还可用 `updatePostFinished` 直接切换帖子完成状态。均带二次确认。
 6. **postadmin 待审批数据源**：`/admin/reviews` 仅 mainadmin 可用；`ReviewsView` 对 postadmin 自动改用 `listPosts({ status: ['pending'] })`，并隐藏申诉筛选与申诉列表。
 7. **本人帖子可见性**：后端允许作者查看自己任意状态的帖子；`PostDetailView` 向作者展示状态徽章与待审核/驳回提示，`ProfileView` 的“我的帖子”卡片始终显示审核状态徽章。
 

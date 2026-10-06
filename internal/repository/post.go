@@ -4,20 +4,23 @@ package repository
 
 import (
 	"errors"
-	//"fmt"
+	"time"
 
-	//"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 
 	"LAF/internal/model"
 	"LAF/pkg/apperror"
 )
 
+var (
+	ErrPostNotFound   = errors.New("post not found")
+	ErrPostNotDeleted = errors.New("post is not deleted")
+)
+
 // PostRepository 持有数据库句柄 db，为帖子提供数据访问能力。
 type PostRepository struct {
 	db *gorm.DB
 }
-
 
 // NewPostRepository 是构造函数，由 router 注入 db。
 func NewPostRepository(db *gorm.DB) *PostRepository {
@@ -26,11 +29,11 @@ func NewPostRepository(db *gorm.DB) *PostRepository {
 
 // GetPostByID 查询未删除的帖子。
 // 查不到时返回 apperror.PostNotFoundError；其他数据库异常统一返回 apperror.DatabaseError。
-func (r *PostRepository) GetPostByID(postID uint64) (*model.Post, error) { 
+func (r *PostRepository) GetPostByID(postID uint64) (*model.Post, error) {
 	var post model.Post
 	err := r.db.Where("id = ?", postID).First(&post).Error
-	if err != nil { 
-		if errors.Is(err, gorm.ErrRecordNotFound) { 
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperror.PostNotFoundError
 		}
 		return nil, apperror.DatabaseError
@@ -42,11 +45,11 @@ func (r *PostRepository) GetPostByID(postID uint64) (*model.Post, error) {
 // GetPostByIDUnscoped 查询“包含已软删除在内”的帖子。
 // Unscoped() 会跳过 GORM 默认的“自动过滤 deleted_at IS NULL”，
 // 因此能查到已删除的帖子，用于“恢复帖子”等场景。
-func (r *PostRepository) GetPostByIDUnscoped(postID uint64) (*model.Post, error) { 
+func (r *PostRepository) GetPostByIDUnscoped(postID uint64) (*model.Post, error) {
 	var post model.Post
 	err := r.db.Unscoped().Where("id = ?", postID).First(&post).Error
-	if err != nil { 
-		if errors.Is(err, gorm.ErrRecordNotFound) { 
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperror.PostNotFoundError
 		}
 		return nil, apperror.DatabaseError
@@ -56,7 +59,7 @@ func (r *PostRepository) GetPostByIDUnscoped(postID uint64) (*model.Post, error)
 }
 
 // Create 插入一条帖子，自增主键会回填到 post.ID。
-func (r *PostRepository) Create(post *model.Post) error { 
+func (r *PostRepository) Create(post *model.Post) error {
 	if err := r.db.Create(post).Error; err != nil {
 		return apperror.DatabaseError
 	}
@@ -66,12 +69,15 @@ func (r *PostRepository) Create(post *model.Post) error {
 // DeletePost 删除帖子，并在同一事务里一并软删除其下所有评论。
 // 为什么要手动删评论？因为软删除只是 UPDATE，不会触发数据库外键级联；
 // 用 Transaction 保证“删评论 + 删帖子”要么都成功、要么都回滚，避免出现半删状态。
-func (r *PostRepository) DeletePost(postID uint64) error { 
+// 为什么要显式指定 deleted_at = now？若让两条 UPDATE 各自取数据库当前时间，可能跨毫秒得到
+// 不同时间戳，导致 RecoverPost 无法用“同批时间戳”精确匹配到评论；统一用同一个 now 规避。
+func (r *PostRepository) DeletePost(postID uint64) error {
+	now := time.Now().Truncate(time.Millisecond) // 截断到毫秒，与数据库 datetime(3) 精度一致
 	err := r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("post_id = ?", postID).Delete(&model.Comment{}).Error; err != nil {
+		if err := tx.Unscoped().Model(&model.Comment{}).Where("post_id = ? AND deleted_at IS NULL", postID).Update("deleted_at", now).Error; err != nil {
 			return err
 		}
-		return tx.Delete(&model.Post{}, postID).Error
+		return tx.Unscoped().Model(&model.Post{}).Where("id = ? AND deleted_at IS NULL", postID).Update("deleted_at", now).Error
 	})
 	if err != nil {
 		return apperror.DatabaseError
@@ -81,18 +87,41 @@ func (r *PostRepository) DeletePost(postID uint64) error {
 
 // RecoverPost 恢复被软删除的帖子：把 deleted_at 重新置为 NULL。
 // 必须用 Unscoped() 才能操作到已软删除的记录(否则 GORM 会自动加上“未删除”条件)。
-func (r *PostRepository) RecoverPost(postID uint64) error { 
-	if err := r.db.Unscoped().Model(&model.Post{}).Where("id = ?", postID).Update("deleted_at", nil).Error; err != nil {
+func (r *PostRepository) RecoverPost(postID uint64) error {
+	var post model.Post
+	if err := r.db.Unscoped().Where("id = ?", postID).First(&post).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrPostNotFound
+		}
+		return apperror.DatabaseError
+	}
+	if !post.DeletedAt.Valid {
+		return ErrPostNotDeleted // 帖子当前是正常状态，无需恢复
+	}
+	batchTime := post.DeletedAt.Time // 帖子原删除时间 = 本次删除批次的时间戳
+
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Unscoped().Model(&model.Post{}).Where("id = ?", postID).Update("deleted_at", nil).Error; err != nil {
+			return err
+		}
+		// deleted_at = batchTime：精确命中“与帖子同批删除”的内容，避免误恢复其它时间删除的评论。
+		if err := tx.Unscoped().Model(&model.Comment{}).Where("post_id = ? AND deleted_at = ?", postID, batchTime).Update("deleted_at", nil).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
 		return apperror.DatabaseError
 	}
 	return nil
 }
 
-// GetPosts 分页查询帖子，支持按 type / status / finished 过滤。
+// GetPosts 分页查询帖子，支持按 type / status / finished / keyword(标题模糊) 过滤。
 // 过滤条件用“仅当有值时才拼接”的方式，实现对空过滤条件的忽略；finished 为 nil 表示不限。
+// keyword 非空时按标题模糊匹配(title LIKE %keyword%)，用于“搜索物品名称”，输入不必完全精确。
 // 同样用闭包复用基础查询，先 Count 求总数，再 Limit/Offset 取当页数据；
 // 排序为“未完成优先(is_finished 升序)，同组内新帖在前(id 倒序)”，使已完成帖子沉到列表末尾。
-func (r *PostRepository) GetPosts(types []string, statuses []string, finished *bool, limit, offset int) ([]*model.Post, int64, error) {
+func (r *PostRepository) GetPosts(types []string, statuses []string, finished *bool, keyword string, limit, offset int) ([]*model.Post, int64, error) {
 	var posts []*model.Post
 	var total int64
 
@@ -106,6 +135,9 @@ func (r *PostRepository) GetPosts(types []string, statuses []string, finished *b
 		}
 		if finished != nil {
 			query = query.Where("is_finished = ?", *finished)
+		}
+		if keyword != "" {
+			query = query.Where("title LIKE ?", "%"+keyword+"%")
 		}
 		return query
 	}

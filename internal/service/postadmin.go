@@ -44,11 +44,16 @@ func (s *PostAdminService) ReviewPost(postID uint64, status string) error {
 	return s.repository.UpdatePostStatus(postID, status)
 }
 
-// UpdatePostStatus 直接修改帖子状态(管理员通用入口，允许改成任意合法状态)。
-// 会先校验状态合法并确认帖子存在，再更新。
+// UpdatePostStatus 直接修改帖子状态(管理员通用入口)。规则：
+//   1) 状态必须合法(approved / rejected)，不允许改成 pending——被审核过的帖子不能退回待审核；
+//   2) 帖子必须存在；
+//   3) 允许在 approved 与 rejected 之间多次反复修改(重复调用不限制次数)。
 func (s *PostAdminService) UpdatePostStatus(postID uint64, status string) error {
 	if !IsValidPostStatus(status) {
 		return apperror.InvalidPostStatusError
+	}
+	if status == model.PostStatusPending {
+		return apperror.PostStatusCannotBePendingError
 	}
 
 	if _, err := s.repository.GetPostByID(postID); err != nil {
@@ -56,6 +61,15 @@ func (s *PostAdminService) UpdatePostStatus(postID uint64, status string) error 
 	}
 
 	return s.repository.UpdatePostStatus(postID, status)
+}
+
+// UpdatePostFinished 直接修改帖子的“是否完成”标记(管理员通用入口)，可多次反复切换(true/false)。
+// 会先确认帖子存在，再更新 is_finished。
+func (s *PostAdminService) UpdatePostFinished(postID uint64, finished bool) error {
+	if _, err := s.repository.GetPostByID(postID); err != nil {
+		return err
+	}
+	return s.repository.SetPostFinished(postID, finished)
 }
 
 // GetDeletedPosts 分页查询已删除帖子(回收站)，同样把 page/page_size 换算成 limit/offset。

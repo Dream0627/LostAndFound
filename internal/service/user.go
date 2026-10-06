@@ -176,10 +176,11 @@ func (s *UserService) GetPostsByUserID(userID uint64) ([]*model.Post, error) {
 	return posts, nil
 }
 
-// GetProfileResult 是个人资料页的返回：用户信息 + 其发布的帖子。
+// GetProfileResult 是个人资料页的返回：用户信息 + 其发布的帖子 + 其收藏的帖子(收藏夹)。
 type GetProfileResult struct {
-	User  *model.User   `json:"user"`
-	Posts []*model.Post `json:"posts"`
+	User      *model.User   `json:"user"`
+	Posts     []*model.Post `json:"posts"`
+	Favorites []*model.Post `json:"favorites"` // 收藏夹：由 handler 层注入收藏服务后填充
 }
 
 // GetProfile 组合“用户信息”与“其帖子列表”一并返回。

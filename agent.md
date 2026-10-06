@@ -62,12 +62,15 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 - 用户：`handler/user/{register,login,profile,update_profile,update_password,deactivate}.go` + `service/user.go` + `repository/user.go`
 - 帖子：`handler/post/{create,list,detail,delete,recover_post}.go` + `service/post.go` + `repository/post.go`
 - 帖子管理：`handler/postadmin/{review_post,update_status,list_deleted}.go` + `service/postadmin.go` + `repository/postadmin.go`
+- 公告：`handler/announcement/list.go`（公开列表）+ `handler/postadmin/{announcement_create,announcement_delete}.go`（管理员发布/删除）+ `service/announcement.go` + `repository/announcement.go`
 - 评论：`handler/comment/{create,list,delete}.go` + `service/comment.go` + `repository/comment.go`
 - 申诉：`handler/appeal/create.go` + `service/appeal.go` + `repository/appeal.go`
+- 反馈：`handler/feedback/{submit,list,review}.go` + `service/feedback.go` + `repository/feedback.go`
+- 收藏：`handler/favorite/{add,remove}.go` + `service/favorite.go` + `repository/favorite.go`
 - 对话/完成寻找：`handler/conversation/{start,list,messages,send,finish,get_pending_finish,review_finish,withdraw_finish}.go` + `service/conversation.go` + `repository/{conversation,message,finish_request}.go`
 - 定位：`handler/geo/{locations,locate}.go` + `service/geo.go` + `pkg/geo/`
-- 超级管理员：`handler/mainadmin/{delete_user,recover_user,review_appeal,list_reviews}.go` + `service/mainadmin.go` + `repository/mainadmin.go`
-- 作者姓名回填：`repository/authorname.go`（跨 Post/Comment 复用）
+- 超级管理员：`handler/mainadmin/{delete_user,recover_user,review_appeal,list_reviews,count}.go` + `service/mainadmin.go` + `repository/count.go`
+- 作者姓名回填：`repository/authorname.go`（跨 Post/Comment/Announcement 复用）
 - 分页结果结构：`service/pageresult.go`（泛型 `PageResult[T]`）
 - 路由：`internal/router/router.go`
 
@@ -75,7 +78,7 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 
 ## 4. 接口与路由约定（以 `internal/router/router.go` 为准）
 
-**前缀**：所有业务接口挂在 `/api/v1` 之下。路径参数一律用 `:post_id` / `:comment_id` / `:user_id` / `:appeal_id` / `:conversation_id` / `:request_id`，handler 内 `strconv.ParseUint(..., 10, 64)` 并校验 `> 0`，非法返回 400。
+**前缀**：所有业务接口挂在 `/api/v1` 之下。路径参数一律用 `:post_id` / `:comment_id` / `:user_id` / `:appeal_id` / `:conversation_id` / `:request_id` / `:announcement_id` / `:feedback_id`，handler 内 `strconv.ParseUint(..., 10, 64)` 并校验 `> 0`，非法返回 400。
 
 ### 认证/用户 `/api/v1/auth`
 | 方法 | 路径 | 中间件 | handler |
@@ -98,6 +101,8 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 | PATCH | `/:post_id/review` | Auth + RequireRole[postadmin,mainadmin] | `postadmin.ReviewPost` |
 | POST | `/:post_id/conversations` | Auth | `conversation.Start`（申领/召领：按 type 自动判定） |
 | GET | `/:post_id/comments` | 公开 | `comment.List` |
+| POST | `/:post_id/favorite` | Auth | `favorite.Add`（收藏帖子，幂等） |
+| DELETE | `/:post_id/favorite` | Auth | `favorite.Remove`（取消收藏，幂等） |
 
 ### 评论 `/api/v1/comments`
 | 方法 | 路径 | 中间件 | handler |
@@ -116,6 +121,18 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 | GET | `/locations` | `geo.ListLocations` |
 | POST | `/locate` | `geo.Locate` |
 
+### 公告 `/api/v1/announcements`
+| 方法 | 路径 | 中间件 | handler |
+|------|------|--------|---------|
+| GET | `` | 公开 | `announcement.List`（分页，回填发布管理员 `author_name`） |
+
+### 反馈 `/api/v1/feedbacks`
+| 方法 | 路径 | 中间件 | handler |
+|------|------|--------|---------|
+| POST | `` | Auth | `feedback.Submit`（登录用户提交，内容 1–1000 字符） |
+
+> 反馈的**列表 / 审批**见下方「管理员」路由，均仅 `mainadmin`。
+
 ### 对话 `/api/v1/conversations`（全部需 Auth）
 | 方法 | 路径 | handler |
 |------|------|---------|
@@ -132,17 +149,26 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 | 方法 | 路径 | 角色 | handler |
 |------|------|------|---------|
 | PATCH | `/posts/:post_id/status` | postadmin, mainadmin | `postadmin.UpdatePostStatus` |
+| PATCH | `/posts/:post_id/finished` | postadmin, mainadmin | `postadmin.UpdatePostFinished` |
 | GET | `/posts/deleted` | postadmin, mainadmin | `postadmin.ListDeletedPosts` |
+| POST | `/announcements` | postadmin, mainadmin | `postadmin.CreateAnnouncement` |
+| DELETE | `/announcements/:announcement_id` | postadmin, mainadmin | `postadmin.DeleteAnnouncement` |
 | DELETE | `/users/:user_id` | mainadmin | `mainadmin.DeleteUser` |
 | PATCH | `/users/:user_id/recover` | mainadmin | `mainadmin.RecoverUser` |
 | PATCH | `/appeals/:appeal_id/review` | mainadmin | `mainadmin.ReviewAppeal` |
 | GET | `/reviews` | mainadmin | `mainadmin.ListReviews`（`?type=post|appeal` 过滤） |
+| GET | `/count` | mainadmin | `mainadmin.GetCountHandler`（后台概览计数） |
+| GET | `/feedbacks` | mainadmin | `feedback.List`（`?status=pending|approved|rejected` 过滤，回填提交人 `author_name`） |
+| PATCH | `/feedbacks/:feedback_id/review` | mainadmin | `feedback.Review`（审批：`approved`/`rejected`，仅 pending 可审） |
 
 **约定**
 - 列表接口统一走 `pkg/pagination`：`page`（默认 1）+ `page_size`（默认 20，上限 100），**不对外暴露 limit/offset**；返回信封 `{ list, total, page, page_size }`（见 `service.PageResult[T]`）。
 - 列表重复参数（如帖子 type）用 `c.QueryArray("type")`；前端 axios 已自定义 `paramsSerializer` 序列化成 `type=lost&type=found`。
 - 列表/详情常用 `middleware.OptionalAuth`：带 token 时注入身份，不带则匿名。
 - 帖子列表排序：`is_finished asc, id desc`（未完成优先，新帖在前）。
+- 帖子列表搜索：可选查询参数 `keyword` 按标题模糊匹配（`title LIKE %keyword%`），用于搜索物品名称；service 层先 `strings.TrimSpace` 去空白。
+- 收藏帖子：`POST/DELETE /posts/:post_id/favorite`，收藏/取消均幂等；收藏夹在 `GET /api/v1/auth/profile` 的 `favorites` 字段返回。
+- 管理员改帖子状态：`UpdatePostStatus`（`/admin/posts/:post_id/status`）只能改为 `approved`/`rejected`，**禁止改成 `pending`**，且可在两态间多次反复改；初审走 `ReviewPost`（`/posts/:post_id/review`，仅 `pending` 可审一次）。另外 `UpdatePostFinished`（`/admin/posts/:post_id/finished`）直接改帖子的 `is_finished`（可反复切换 true/false）。
 - 帖子详情可见性（`PostService.GetVisiblePost(postID, userID, role)`）：管理员可见任意状态；**作者本人可见自己任意状态的帖子**；其他人仅见 `approved`，不可见统一返回“帖子不存在”。
 - 会话对象的 `PostTitle/PostStatus/PostFinished` 为 `gorm:"-"` 非表字段，由 `ConversationService.fillPostSnapshot` 按 `post_id` 实时回填（列表与详情均回填），不落库、不写迁移。
 - 完成申请的发起/同意/拒绝/撤回会写入系统消息：`Message.SenderID` 为 `*uint64` 指针，系统消息写 NULL（`messages.sender_id` 可空，有指向 users 的外键，不能写 0）；写入失败被忽略、不阻断主流程。
@@ -184,19 +210,20 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 
 ## 7. 数据模型与软删除
 
-**表 / 模型（`internal/model/model.go`，须与 `migrations/tables.sql` 同步）**：`users`、`posts`、`comments`、`appeals`、`conversations`、`messages`、`finish_requests`。均含 `created_at, updated_at, deleted_at`（GORM 软删除）。
+**表 / 模型（`internal/model/model.go`，须与 `migrations/tables.sql` 同步）**：`users`、`posts`、`comments`、`appeals`、`conversations`、`messages`、`finish_requests`、`announcements`、`feedbacks`、`favorites`。均含 `created_at, updated_at, deleted_at`（GORM 软删除）。
 
 **状态枚举常量**
 - 帖子审核：`pending` / `approved` / `rejected`；帖子类型：`lost` / `found`
 - 申诉原因：`self_regret` / `wrongful_ban` / `other`；申诉状态：`pending` / `approved` / `rejected`
 - 完成申请状态：`pending` / `agreed` / `rejected`（同意后对应帖子 `is_finished=true`）
+- 反馈审批状态：`pending` / `approved` / `rejected`（超管审批，仅 pending 可审）
 
 **关键规则**
-- **软删除不触发外键级联**：删父表（帖子）时必须在**同一事务内先软删子表（评论）再软删帖子**（见 `PostRepository.DeletePost`）。DDL 的 `ON DELETE CASCADE` 只对物理删除生效。
-- **恢复不级联**：恢复帖子只把帖子 `deleted_at` 置 NULL，不自动恢复评论；恢复用户时只恢复“与其同批删除”的帖子与评论。
+- **软删除不触发外键级联**：删父表（帖子）时必须在**同一事务内先软删子表（评论）再软删帖子**，且两者共用**同一个 `deleted_at` 时间戳**（见 `PostRepository.DeletePost`），否则恢复时无法按“同批时间戳”精确匹配。DDL 的 `ON DELETE CASCADE` 只对物理删除生效。
+- **恢复语义**：恢复帖子会把帖子及其“同批删除（`deleted_at` 相同）”的评论一并恢复（见 `PostRepository.RecoverPost`）；恢复用户时同样只恢复“与其同批删除”的帖子与评论。
 - 查含已删记录用带 `Unscoped()` 的方法；恢复用 `Unscoped()` 把 `deleted_at` 置 NULL。
 - **`model.go` 与 `migrations/tables.sql` 必须同步修改**。
-- **作者姓名回填**：`Post`/`Comment` 的 `AuthorName` 标注 `gorm:"-" json:"author_name"`（不入库），由 `repository/authorname.go` 按 `user_id` 批量关联 `users` 后回填；查不到作者（如已软删）兜底为 `"未知用户"`。查询帖子的仓库方法（`GetPostByID` / `GetPosts` / `GetDeletedPosts` 等）末尾都会调用回填。
+- **作者姓名回填**：`Post`/`Comment`/`Announcement`/`Feedback` 的 `AuthorName` 标注 `gorm:"-" json:"author_name"`（不入库），由 `repository/authorname.go` 按 `user_id`（公告按 `admin_id`）批量关联 `users` 后回填；查不到作者（如已软删）兜底为 `"未知用户"`。查询帖子的仓库方法（`GetPostByID` / `GetPosts` / `GetDeletedPosts` 等）末尾都会调用回填。
 
 ---
 
@@ -293,7 +320,7 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 - 鉴权：`Authorization: Bearer <token>`（HS256，必带过期）。
 - ID 解析：`ParseUint(...,10,64)` 且校验 `>0`。
 - 权限：student 仅本人；postadmin 管理帖子/评论；mainadmin 另有账号/申诉/审批。
-- 软删级联：事务内先子后父；恢复不级联。
+- 软删级联：事务内先子后父、共用同一 `deleted_at` 时间戳；恢复只恢复“同批删除”的内容。
 - 图片：只存 `/uploads/...` 相对路径。
 - 作者姓名：`AuthorName`（`gorm:"-"`）由 `repository/authorname.go` 回填，缺失兜底 `"未知用户"`。
 - **Abort 后必须 return**。

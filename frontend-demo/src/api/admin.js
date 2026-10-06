@@ -3,9 +3,14 @@
 // mainadmin 专属：注销/恢复用户。
 import http from "./http";
 
-// 直接修改帖子状态（postadmin/mainadmin）：status = pending|approved|rejected
+// 直接修改帖子状态（postadmin/mainadmin）：status = approved|rejected（不允许 pending）
 export function updatePostStatus(postId, status) {
   return http.patch(`/admin/posts/${postId}/status`, { status });
+}
+
+// 直接修改帖子完成状态（postadmin/mainadmin）：finished = true|false（可反复切换）
+export function updatePostFinished(postId, finished) {
+  return http.patch(`/admin/posts/${postId}/finished`, { finished });
 }
 
 // 已删除帖子列表（postadmin/mainadmin，分页）

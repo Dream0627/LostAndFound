@@ -1,5 +1,5 @@
 // 查询帖子列表
-// 本文件对应“查询帖子列表”接口。支持按类型、状态过滤并分页。
+// 本文件对应“查询帖子列表”接口。支持按类型、状态过滤，并支持按标题(keyword)模糊搜索、分页。
 package post
 
 import (
@@ -17,6 +17,7 @@ func ListPosts(postService *service.PostService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		types := c.QueryArray("type") // 读取可重复的 type 查询参数(?type=lost&type=found)
 		statuses := c.QueryArray("status") // 读取可重复的 status 查询参数
+		keyword := c.Query("keyword") // 读取关键词，按标题模糊搜索物品名称(可为空)
 		page, pageSize := pagination.Parse(c.Query("page"), c.Query("page_size"))
 
 		// finished 解析“已完成/未完成”筛选项：空=不限，true=已完成，false=未完成；非法值按参数错误处理。
@@ -28,7 +29,7 @@ func ListPosts(postService *service.PostService) gin.HandlerFunc {
 
 		nowUserRole, _ := middleware.CurrentRole(c)
 
-		result, err := postService.GetPosts(types, statuses, finished, nowUserRole, page, pageSize) // 交由业务层做过滤与可见性控制
+		result, err := postService.GetPosts(types, statuses, finished, keyword, nowUserRole, page, pageSize) // 交由业务层做过滤、搜索与可见性控制
 		if err != nil {
 			apperror.AbortWithError(c, err)
 			return

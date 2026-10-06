@@ -16,22 +16,25 @@ const (
 	ReviewTypeAppeal = "appeal"
 )
 
-// MainAdminService 依赖三个仓库：
+// MainAdminService 依赖四个仓库：
 //   - userRepository   ：注销/恢复用户(含同批内容)；
 //   - postRepository   ：汇总“待审核帖子”；
-//   - appealRepository ：审核申诉、汇总“待审核申诉”。
+//   - appealRepository ：审核申诉、汇总“待审核申诉”；
+//   - countRepository  ：汇总后台概览数据。
 type MainAdminService struct {
 	userRepository   *repository.UserRepository
 	postRepository   *repository.PostRepository
 	appealRepository *repository.AppealRepository
+	countRepository  *repository.CountRepository
 }
 
-// NewMainAdminService 由 router 注入用户、帖子、申诉三个仓库。
-func NewMainAdminService(userRepository *repository.UserRepository, postRepository *repository.PostRepository, appealRepository *repository.AppealRepository) *MainAdminService {
+// NewMainAdminService 由 router 注入用户、帖子、申诉、计数四个仓库。
+func NewMainAdminService(userRepository *repository.UserRepository, postRepository *repository.PostRepository, appealRepository *repository.AppealRepository, countRepository *repository.CountRepository) *MainAdminService {
 	return &MainAdminService{
 		userRepository:   userRepository,
 		postRepository:   postRepository,
 		appealRepository: appealRepository,
+		countRepository:  countRepository,
 	}
 }
 
@@ -127,7 +130,7 @@ func (s *MainAdminService) GetPendingReviews(reviewType string, page, pageSize i
 	}
 
 	if includePosts {
-		posts, _, err := s.postRepository.GetPosts(nil, []string{model.PostStatusPending}, nil, pageSize, offset) // finished=nil: 待审核列表不限完成状态
+		posts, _, err := s.postRepository.GetPosts(nil, []string{model.PostStatusPending}, nil, "", pageSize, offset) // finished=nil: 待审核列表不限完成状态
 		if err != nil {
 			return nil, err
 		}
@@ -143,4 +146,30 @@ func (s *MainAdminService) GetPendingReviews(reviewType string, page, pageSize i
 	}
 
 	return result, nil
+}
+
+// CountResult 是“后台数据计数”的返回结构(对外的 JSON 字段统一采用 snake_case)。
+type CountResult struct {
+	UserCount          int64 `json:"user_count"`
+	PostCount          int64 `json:"post_count"`
+	PendingPostCount   int64 `json:"pending_post_count"`
+	PendingAppealCount int64 `json:"pending_appeal_count"`
+	TodayPostCount     int64 `json:"today_post_count"`
+	TodayCommentCount  int64 `json:"today_comment_count"`
+}
+
+// GetCount 汇总后台概览计数，供超级管理员首页展示。
+func (s *MainAdminService) GetCount() (*CountResult, error) {
+	count, err := s.countRepository.GetCount()
+	if err != nil {
+		return nil, err
+	}
+	return &CountResult{
+		UserCount:          count.UserCount,
+		PostCount:          count.PostCount,
+		PendingPostCount:   count.PendingPostCount,
+		PendingAppealCount: count.PendingAppealCount,
+		TodayPostCount:     count.TodayPostCount,
+		TodayCommentCount:  count.TodayCommentCount,
+	}, nil
 }
