@@ -11,6 +11,18 @@
 
 ---
 
+## 更新内容速览
+
+> 记录近期新增/调整的功能，便于快速定位对应章节。
+
+- **用户反馈**：登录用户提交反馈，超级管理员后台审批（`approved`/`rejected`）→ 见「十、反馈模块」「六、超级管理员模块」。
+- **帖子搜索**：帖子列表新增 `keyword` 查询参数，按标题模糊搜索物品名称 → 见「二、帖子模块」。
+- **收藏帖子**：`POST/DELETE /posts/:post_id/favorite`；收藏夹在个人档案 `favorites` 字段返回 → 见「二、帖子模块」「一、认证与用户模块」。
+- **帖子状态规则**：管理员可多次改审（通过/驳回），但**不能改回待审核**；初审走审核接口 → 见「三、管理员专用」。
+- **帖子完成状态**：管理员可直接修改 `is_finished`（标记完成/取消完成）→ 见「三、管理员专用」。
+
+---
+
 ## 快速上手
 
 1. **配置**：复制 `config/config.example.yaml` 为 `config/config.yaml`，填写 MySQL 连接与 JWT secret（该文件已加入 `.gitignore`）。
@@ -147,8 +159,8 @@
 ### 3. 获取个人资料
 - **接口**：`GET /api/v1/auth/profile`
 - **鉴权**：需要
-- **用途**：查看本人信息与本人发布的帖子列表。
-- **响应**：`{ "user": {...}, "posts": [...] }`
+- **用途**：查看本人信息、本人发布的帖子列表与收藏夹(收藏的帖子)。
+- **响应**：`{ "user": {...}, "posts": [...], "favorites": [...] }`
 
 ### 4. 更新个人资料
 - **接口**：`PATCH /api/v1/auth/profile`
@@ -200,7 +212,7 @@
 ### 2. 帖子列表（筛选 + 分页）
 - **接口**：`GET /api/v1/posts`
 - **鉴权**：可选（带 token 会识别身份，不带则匿名）
-- **用途**：查询帖子列表。**普通用户仅见 `approved`；管理员可见全部并可按状态筛选。**
+- **用途**：查询帖子列表。**普通用户仅见 `approved`；管理员可见全部并可按状态筛选。** 支持按标题关键词模糊搜索物品名称。
 - **排序**：**未完成帖子优先，已完成帖子沉到列表末尾**（`is_finished` 升序，同组内 `id` 倒序）。
 - **查询参数**：
   | 参数 | 类型 | 必传 | 说明 |
@@ -208,6 +220,7 @@
   | `type` | string[] | 否 | 可多选：`?type=lost&type=found` |
   | `status` | string[] | 否 | 可多选：`pending/approved/rejected`；仅管理员有效，普通用户强制 `approved` |
   | `finished` | string | 否 | 按“是否完成”筛选：`true` 只看已完成、`false` 只看未完成、不传为全部（所有角色均可用） |
+  | `keyword` | string | 否 | 按标题模糊搜索物品名称（`title LIKE %keyword%`），输入不必完全精确 |
   | `page` | int | 否 | 页码，从 1 开始，默认 1 |
   | `page_size` | int | 否 | 每页数量，默认 20，上限 100 |
 - **响应**：`{ list:[...], total, page, page_size }`
@@ -248,6 +261,21 @@
 - **响应**：`{ "code":0, "msg":"success", "data":{ "post_id":10, "status":"approved" } }`
 - **常见错误**：`400 无效的帖子状态`；`400 该帖子不可审核`（非 pending）
 
+### 7. 收藏帖子
+- **接口**：`POST /api/v1/posts/:post_id/favorite`
+- **鉴权**：需要（登录用户）
+- **用途**：收藏一篇帖子（幂等：重复收藏不报错，仍保持已收藏）。
+- **路径参数**：`post_id`（uint64，必传）
+- **响应**：`{ "code":0, "msg":"success", "data":{ "post_id":10, "favorited":true } }`
+- **常见错误**：`404 帖子不存在`
+
+### 8. 取消收藏
+- **接口**：`DELETE /api/v1/posts/:post_id/favorite`
+- **鉴权**：需要（登录用户）
+- **用途**：取消收藏（幂等：本就未收藏时调用也返回成功）。
+- **路径参数**：`post_id`（uint64，必传）
+- **响应**：`{ "code":0, "msg":"success", "data":{ "post_id":10, "favorited":false } }`
+
 ---
 
 ## 三、管理员专用（/api/v1/admin）
@@ -255,22 +283,33 @@
 ### 1. 修改帖子状态（仅管理员）
 - **接口**：`PATCH /api/v1/admin/posts/:post_id/status`
 - **鉴权**：需要，角色为 `postadmin` 或 `mainadmin`
-- **用途**：直接修改帖子状态（可任意设置为 `pending/approved/rejected`）。
+- **用途**：直接修改帖子状态（可在 `approved` / `rejected` 之间多次反复修改；**不能改回待审核 `pending`**）。
 - **路径参数**：`post_id`（uint64，必传）
 - **请求体（JSON）**：
   | 参数 | 类型 | 必传 | 说明 |
   |------|------|------|------|
-  | `status` | string | 是 | `pending` / `approved` / `rejected` |
-- **响应**：`{ "code":0, "msg":"success", "data":{ "post_id":10, "status":"pending" } }`
+  | `status` | string | 是 | `approved` / `rejected`（不允许 `pending`） |
+- **响应**：`{ "code":0, "msg":"success", "data":{ "post_id":10, "status":"approved" } }`
 
-### 2. 已删除帖子列表（仅管理员）
+### 2. 修改帖子完成状态（仅管理员）
+- **接口**：`PATCH /api/v1/admin/posts/:post_id/finished`
+- **鉴权**：需要，角色为 `postadmin` 或 `mainadmin`
+- **用途**：直接修改帖子「是否完成」（`is_finished`），可多次反复切换。
+- **路径参数**：`post_id`（uint64，必传）
+- **请求体（JSON）**：
+  | 参数 | 类型 | 必传 | 说明 |
+  |------|------|------|------|
+  | `finished` | bool | 是 | `true` 已完成 / `false` 未完成 |
+- **响应**：`{ "code":0, "msg":"success", "data":{ "post_id":10, "is_finished":true } }`
+
+### 3. 已删除帖子列表（仅管理员）
 - **接口**：`GET /api/v1/admin/posts/deleted`
 - **鉴权**：需要，角色为 `postadmin` 或 `mainadmin`
 - **用途**：查询已被软删除的帖子列表。
 - **查询参数**：`page`（默认 1）、`page_size`（默认 20，上限 100）
 - **响应**：`{ list:[...], total, page, page_size }`
 
-### 3. 发布公告（仅管理员）
+### 4. 发布公告（仅管理员）
 - **接口**：`POST /api/v1/admin/announcements`
 - **鉴权**：需要，角色为 `postadmin` 或 `mainadmin`
 - **用途**：发布一条全站公告。**发布者取自 token**，不接受请求体传入 `admin_id`。
@@ -281,7 +320,7 @@
   | `content` | string | 是 | 公告内容，1–2000 字符 |
 - **响应**：返回创建的公告对象（`id, admin_id, author_name, title, content, created_at`）
 
-### 4. 删除公告（仅管理员）
+### 5. 删除公告（仅管理员）
 - **接口**：`DELETE /api/v1/admin/announcements/:announcement_id`
 - **鉴权**：需要，角色为 `postadmin` 或 `mainadmin`
 - **用途**：软删除公告。
@@ -395,6 +434,29 @@
 - **接口**：`GET /api/v1/admin/count`
 - **用途**：后台首页概览计数（用户/帖子总数、待审核帖子数、待处理申诉数、今日新增帖子/评论数）。
 - **响应**：`{ "code":0, "msg":"success", "data":{ "user_count":.., "post_count":.., "pending_post_count":.., "pending_appeal_count":.., "today_post_count":.., "today_comment_count":.. } }`
+
+### 6. 反馈列表
+- **接口**：`GET /api/v1/admin/feedbacks`
+- **用途**：查看用户提交的反馈列表，可按审批状态筛选；按 `id` 倒序（新反馈在前），回填提交人姓名 `author_name`。
+- **查询参数**：
+  | 参数 | 类型 | 必传 | 说明 |
+  |------|------|------|------|
+  | `status` | string | 否 | `pending` / `approved` / `rejected`；不传则不过滤 |
+  | `page` | int | 否 | 默认 1 |
+  | `page_size` | int | 否 | 默认 20，上限 100 |
+- **响应**：`{ list:[...], total, page, page_size }`，元素含 `id, user_id, author_name, content, status, created_at`
+- **常见错误**：`400 无效的反馈状态`
+
+### 7. 审批反馈
+- **接口**：`PATCH /api/v1/admin/feedbacks/:feedback_id/review`
+- **用途**：审批反馈，把 pending 改为通过/驳回；每条反馈仅可审批一次。
+- **路径参数**：`feedback_id`（uint64，必传）
+- **请求体（JSON）**：
+  | 参数 | 类型 | 必传 | 说明 |
+  |------|------|------|------|
+  | `status` | string | 是 | `approved` 或 `rejected` |
+- **响应**：`{ "code":0, "msg":"success", "data":{ "feedback_id":5, "status":"approved" } }`
+- **常见错误**：`400 无效的反馈状态`；`400 该反馈不可审批`；`404 反馈不存在`
 
 ---
 
@@ -545,6 +607,22 @@
 
 ---
 
+## 十、反馈模块（/api/v1/feedbacks）
+
+### 1. 提交反馈
+- **接口**：`POST /api/v1/feedbacks`
+- **鉴权**：需要（登录用户）
+- **用途**：提交一条反馈。**提交人取自 token**，不接受请求体传入 `user_id`。
+- **请求体（JSON）**：
+  | 参数 | 类型 | 必传 | 说明 |
+  |------|------|------|------|
+  | `content` | string | 是 | 反馈内容，1–1000 字符 |
+- **响应**：返回创建的反馈对象（`id, user_id, content, status, created_at`）
+
+> 反馈的**列表 / 审批**为超级管理员接口，见「六、超级管理员模块」的 `GET /api/v1/admin/feedbacks` 与 `PATCH /api/v1/admin/feedbacks/:feedback_id/review`。
+
+---
+
 ## 认证与鉴权细节
 
 - **令牌格式**：`Authorization: Bearer <access_token>`（`Bearer` 后必须有一个空格）
@@ -573,6 +651,7 @@
 6. **token 失效怎么办？** 重新登录获取新 `access_token` 并替换请求头。
 7. **如何注册管理员？** 注册 `postadmin` 或 `mainadmin` 时需在请求体中提供 `admin_secret`，后端按角色校验对应暗号；暗号配在服务器 `config/config.docker.yaml` 的 `postadmin_secret` / `mainadmin_secret` 中，仅管理员知晓。学生注册无需该字段。
 8. **公告怎么发布和查看？** 管理员用 `POST /api/v1/admin/announcements` 发布、`DELETE /api/v1/admin/announcements/:announcement_id` 删除；所有用户（含未登录）用 `GET /api/v1/announcements` 查看列表。
+9. **用户反馈怎么用？** 登录后用 `POST /api/v1/feedbacks` 提交；超级管理员用 `GET /api/v1/admin/feedbacks` 查看、`PATCH /api/v1/admin/feedbacks/:feedback_id/review` 审批（`approved`/`rejected`）。
 
 ---
 
@@ -586,6 +665,8 @@
 - **messages**：`id, conversation_id, sender_id, content, created_at, updated_at, deleted_at`；外键 `conversation_id → conversations(id)`、`sender_id → users(id)`
 - **finish_requests**：`id, conversation_id, requester_id, status(pending/agreed/rejected), created_at, updated_at, deleted_at`；外键 `conversation_id → conversations(id)`、`requester_id → users(id)`
 - **announcements**：`id, title, content, admin_id, created_at, updated_at, deleted_at`；索引 `created_at DESC, id DESC`、`admin_id`；外键 `admin_id → users(id)`（`ON DELETE CASCADE`）
+- **feedbacks**：`id, user_id, content, status(pending/approved/rejected), created_at, updated_at, deleted_at`；索引 `user_id`、`status`、`created_at DESC, id DESC`；外键 `user_id → users(id)`（`ON DELETE CASCADE`）
+- **favorites**：`id, user_id, post_id, created_at, updated_at, deleted_at`；索引 `user_id`、`post_id`；外键 `user_id → users(id)`、`post_id → posts(id)`（均 `ON DELETE CASCADE`）
 
 ---
 

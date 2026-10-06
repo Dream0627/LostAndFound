@@ -34,6 +34,13 @@ const (
 	AppealStatusRejected = "rejected"
 )
 
+// 反馈审批状态的三种取值：pending 待处理、approved 已采纳、rejected 已驳回。
+const (
+	FeedbackStatusPending  = "pending"
+	FeedbackStatusApproved = "approved"
+	FeedbackStatusRejected = "rejected"
+)
+
 type BaseModel struct {
 	CreatedAt time.Time      `gorm:"column:created_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);comment:创建时间" json:"created_at"`
 	UpdatedAt time.Time      `gorm:"column:updated_at;type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);onUpdate:CURRENT_TIMESTAMP(3);comment:更新时间" json:"updated_at"`
@@ -62,8 +69,6 @@ type Post struct {
 	Type         string  `gorm:"column:type;type:enum('lost','found');not null;default:'lost';comment:帖子类型" json:"type"`
 	Title        string  `gorm:"column:title;type:varchar(2000);not null" json:"title"`
 	ImageURL     *string `gorm:"column:image_url;type:varchar(1024);default:null;comment:图片URL" json:"image_url"` // 用指针类型表示“可为空”，NULL 与空字符串含义不同
-	CategoryID   uint64  `gorm:"column:category_id;index;comment:物品分类ID,允许NULL表示未选择分类" json:"category_id"`
-	CategoryName string  `gorm:"-" json:"category_name"` // 分类名称，非数据库字段，查询帖子后回填给前端展示
 	LocationID   string  `gorm:"column:location_id;type:varchar(64);not null;default:'';comment:校园预设地点ID(冗余快照)" json:"location_id"`
 	LocationName string  `gorm:"column:location_name;type:varchar(128);not null;default:'';comment:地点名称快照(冗余,减少前端查询)" json:"location_name"`
 	Supplement   string  `gorm:"column:supplement;type:varchar(200);not null;default:'';comment:地点补充说明" json:"supplement"`
@@ -151,27 +156,24 @@ type Announcement struct {
 	Title      string `gorm:"column:title;type:varchar(200);not null;comment:公告标题" json:"title"`
 	Content    string `gorm:"column:content;type:varchar(2000);not null;comment:公告内容" json:"content"`
 }
+
+// Feedback 对应用户反馈表。登录用户可提交反馈，超级管理员在后台审批(pending -> approved/rejected)。
+// AuthorName 为非表字段(gorm:"-")，查询时按 user_id 回填提交人姓名，仅用于返回给前端。
 type Feedback struct {
-	gorm.Model
-	UserID  uint64 `gorm:"column:user_id;not null;comment:提交用户ID"`
-	Content string `gorm:"column:content;type:varchar(2000);not null;comment:反馈内容"`
-	Status  string `gorm:"column:status;type:varchar(20);not null;default:'pending';comment:状态 pending待处理 processed已处理 rejected已拒绝"`
+	BaseModel
+	ID         uint64 `gorm:"column:id;primaryKey;autoIncrement;comment:反馈ID" json:"id"`
+	UserID     uint64 `gorm:"column:user_id;not null;index;comment:提交人ID" json:"user_id"`
+	AuthorName string `gorm:"-" json:"author_name"` // 提交人姓名：非表字段，查询后按 user_id 回填，仅用于返回给前端
+	Content    string `gorm:"column:content;type:varchar(1000);not null;comment:反馈内容" json:"content"`
+	Status     string `gorm:"column:status;type:enum('pending','approved','rejected');not null;default:'pending';index;comment:审批状态" json:"status"`
 }
 
-// feedback status const
-const (
-	FeedbackStatusPending   = "pending"
-	FeedbackStatusProcessed = "processed"
-	FeedbackStatusRejected  = "rejected"
-)
-
-// Category 物品分类字典表
-// 意义：统一维护系统全部物品分类选项，作为主数据；前端发布帖子下拉框读取本表；
-// 管理员接口可以新增、禁用、调整排序；所有帖子通过 category_id 外键关联本表，避免字符串重复存储。
-type Category struct {
+// Favorite 对应用户收藏帖子表(多对多关系)。
+// UserID 是收藏者、PostID 是被收藏的帖子；同一用户对同一帖子只保留一条“活跃收藏”(应用层幂等保证)。
+// 取消收藏为软删除，恢复收藏时重新插入新行(旧行保留 deleted_at，无唯一键冲突)。
+type Favorite struct {
 	BaseModel
-	ID     uint64 `gorm:"column:id;primaryKey;autoIncrement;comment:分类ID" json:"id"`
-	Name   string `gorm:"column:name;type:varchar(64);not null;uniqueIndex;comment:分类名称，例：雨伞、充电宝、耳机"`
-	Sort   int    `gorm:"column:sort;default:0;comment:展示排序，数字越小越靠前"`
-	Enable bool   `gorm:"column:enable;default:true;comment:是否启用,false代表禁用不再供选择"`
+	ID     uint64 `gorm:"column:id;primaryKey;autoIncrement;comment:收藏ID" json:"id"`
+	UserID uint64 `gorm:"column:user_id;not null;index;comment:收藏者ID" json:"user_id"`
+	PostID uint64 `gorm:"column:post_id;not null;index;comment:被收藏帖子ID" json:"post_id"`
 }

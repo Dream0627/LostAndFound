@@ -19,12 +19,16 @@
           <StatusBadge v-if="auth.isPostAdmin || isOwner" kind="status" :value="post.status" />
         </div>
         <div class="row">
-          <!-- 待审核/被驳回：走审核接口 -->
+          <!-- 待审核：走审核接口 -->
           <button v-if="canReview" class="btn btn-ghost btn-sm" @click="handleReview('approved')">通过</button>
           <button v-if="canReview" class="btn btn-ghost btn-sm" @click="handleReview('rejected')">驳回</button>
-          <!-- 已通过：管理员仍可直接改状态（下架/打回待审） -->
-          <button v-if="canAdjust" class="btn btn-ghost btn-sm" @click="handleStatusChange('pending')">打回待审</button>
-          <button v-if="canAdjust" class="btn btn-ghost btn-sm" @click="handleStatusChange('rejected')">下架</button>
+          <!-- 已通过/已驳回：管理员可直接改状态，反复切换（不能改回待审核） -->
+          <button v-if="canAdjust && post.status === 'approved'" class="btn btn-ghost btn-sm" @click="handleStatusChange('rejected')">下架</button>
+          <button v-if="canAdjust && post.status === 'rejected'" class="btn btn-ghost btn-sm" @click="handleStatusChange('approved')">重新通过</button>
+          <!-- 管理员：直接切换完成状态（标记完成/取消完成） -->
+          <button v-if="canToggleFinished" class="btn btn-ghost btn-sm" @click="handleToggleFinished(post.is_finished)">
+            {{ post.is_finished ? "取消完成" : "标记完成" }}
+          </button>
           <button v-if="canDelete" class="btn btn-danger btn-sm" @click="handleDelete">删除</button>
         </div>
       </div>
@@ -109,7 +113,7 @@ import {
   startConversation,
 } from "@/api/post";
 import { createComment, deleteComment } from "@/api/comment";
-import { updatePostStatus } from "@/api/admin";
+import { updatePostStatus, updatePostFinished } from "@/api/admin";
 import { useAuthStore } from "@/stores/auth";
 import { useToastStore } from "@/stores/toast";
 import StatusBadge from "@/components/StatusBadge.vue";
@@ -135,17 +139,19 @@ const commentText = ref("");
 const posting = ref(false);
 
 const isOwner = computed(() => auth.isLoggedIn && post.value?.user_id === auth.user?.id);
-// 未完成的非 approved 帖：管理员可走审核流（通过/驳回）。
+// 未完成的待审核帖：管理员可走审核流（通过/驳回）。
 const canReview = computed(
-  () => auth.isPostAdmin && !post.value?.is_finished && post.value?.status !== "approved"
+  () => auth.isPostAdmin && !post.value?.is_finished && post.value?.status === "pending"
 );
-// 已通过的帖子：管理员可随时改状态（下架=rejected、打回待审=pending）。
+// 已通过/已驳回的帖子：管理员可随时改状态（下架=rejected、重新通过=approved），不能改回待审核。
 const canAdjust = computed(
-  () => auth.isPostAdmin && !post.value?.is_finished && post.value?.status === "approved"
+  () => auth.isPostAdmin && !post.value?.is_finished && (post.value?.status === "approved" || post.value?.status === "rejected")
 );
 const canDelete = computed(
   () => auth.isLoggedIn && (auth.isPostAdmin || post.value?.user_id === auth.user?.id)
 );
+// 管理员可随时直接切换帖子的完成状态（未完成↔已完成）。
+const canToggleFinished = computed(() => auth.isPostAdmin);
 const canStartConversation = computed(
   () => auth.isLoggedIn && post.value && post.value.user_id !== auth.user?.id
 );
@@ -199,16 +205,30 @@ async function handleReview(status) {
   }
 }
 
-// 管理员直接修改“已通过”帖子的状态（PATCH /admin/posts/:id/status）。
+// 管理员直接修改“已通过/已驳回”帖子的状态（PATCH /admin/posts/:id/status），可反复切换。
 async function handleStatusChange(status) {
   const tip =
     status === "rejected"
       ? "确定下架该帖子？下架后其他用户将无法在广场看到它。"
-      : "确定把该帖子打回待审核？";
+      : "确定重新通过该帖子？";
   if (!window.confirm(tip)) return;
   try {
     await updatePostStatus(postId, status);
-    toast.success(status === "rejected" ? "已下架" : "已设为待审核");
+    toast.success(status === "rejected" ? "已下架" : "已重新通过");
+    fetchPost();
+  } catch (e) {
+    toast.error(e?.msg || "操作失败");
+  }
+}
+
+// 管理员直接切换帖子的完成状态（PATCH /admin/posts/:id/finished）。
+async function handleToggleFinished(current) {
+  const target = !current;
+  const tip = target ? "确定将该帖子标记为已完成？" : "确定取消该帖子的已完成状态？";
+  if (!window.confirm(tip)) return;
+  try {
+    await updatePostFinished(postId, target);
+    toast.success(target ? "已标记完成" : "已取消完成");
     fetchPost();
   } catch (e) {
     toast.error(e?.msg || "操作失败");

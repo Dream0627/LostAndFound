@@ -49,11 +49,10 @@ func (s *PostService) CheckpostPermission(userID uint64, role string, post *mode
 
 // CreateInput 是“发布帖子”的业务入参 DTO。ImageURL 用指针表示“可选(可为空)”。
 type CreateInput struct {
-	Type       string
-	Title      string
-	Content    string
-	ImageURL   *string
-	CategoryID uint64
+	Type     string
+	Title    string
+	Content  string
+	ImageURL *string
 	// 位置为可选信息：LocationID(手动选择预设地点)或 Latitude/Longitude(自动匹配)二选一，
 	// HasCoords 用于区分“未上报坐标”与“(0,0)”；Supplement 是选择地点后的补充说明。
 	LocationID string
@@ -105,7 +104,6 @@ func (s *PostService) Create(input CreateInput, userID uint64, role string) (*mo
 		Type:         input.Type,
 		Title:        input.Title,
 		ImageURL:     input.ImageURL,
-		CategoryID:   input.CategoryID,
 		LocationID:   locationID,
 		LocationName: locationName,
 		Supplement:   supplement,
@@ -136,7 +134,8 @@ type PostListResult = PageResult[*model.Post]
 //     从而保证未审核/被驳回的帖子不会泄漏给普通用户。
 //   - 若最终没有任何状态条件，则默认放开全部状态(主要用于管理员场景)。
 //   - finished 过滤：nil 表示不限；true 只看已完成，false 只看未完成，所有角色均可使用。
-func (s *PostService) GetPosts(categoryID uint64, types []string, statuses []string, finished *bool, role string, page, pageSize int) (*PostListResult, error) {
+//   - keyword 过滤：非空时按标题模糊搜索(物品名称)，输入不必完全精确。
+func (s *PostService) GetPosts(types []string, statuses []string, finished *bool, keyword string, role string, page, pageSize int) (*PostListResult, error) {
 	validTypes := make([]string, 0, len(types)) // 逐个校验 type，剔除/拦截非法值
 	for _, postType := range types {
 		if postType != "lost" && postType != "found" {
@@ -161,8 +160,10 @@ func (s *PostService) GetPosts(categoryID uint64, types []string, statuses []str
 		validStatuses = append(validStatuses, model.PostStatusPending, model.PostStatusApproved, model.PostStatusRejected)
 	}
 
+	keyword = strings.TrimSpace(keyword) // 去空白后的关键词，用于标题模糊搜索(物品名称)
+
 	offset := pagination.Offset(page, pageSize)
-	posts, total, err := s.repository.GetPosts(categoryID, validTypes, validStatuses, finished, pageSize, offset)
+	posts, total, err := s.repository.GetPosts(validTypes, validStatuses, finished, keyword, pageSize, offset)
 	if err != nil {
 		return nil, err
 	}

@@ -17,6 +17,8 @@ import (
 	announcementhandler "LAF/internal/handler/announcement"
 	appealhandler "LAF/internal/handler/appeal"
 	conversationhandler "LAF/internal/handler/conversation"
+	favoritehandler "LAF/internal/handler/favorite"
+	feedbackhandler "LAF/internal/handler/feedback"
 	geohandler "LAF/internal/handler/geo"
 	mainadminhandler "LAF/internal/handler/mainadmin"
 	postadminhandler "LAF/internal/handler/postadmin"
@@ -49,6 +51,10 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, postadminSecret, mainadminSecr
 	conversationService := service.NewConversationService(conversationRepository, messageRepository, finishRequestRepository, postRepository) // 对话/完成寻找服务(复用 postRepository)
 	announcementRepository := repository.NewAnnouncementRepository(db)
 	announcementService := service.NewAnnouncementService(announcementRepository)
+	feedbackRepository := repository.NewFeedbackRepository(db)
+	feedbackService := service.NewFeedbackService(feedbackRepository)
+	favoriteRepository := repository.NewFavoriteRepository(db)
+	favoriteService := service.NewFavoriteService(favoriteRepository, postRepository)
 
 	//postAdminRepository := repository.NewPostAdminRepository(db)
 	//postAdminService := service.NewPostAdminService(postAdminRepository)
@@ -58,7 +64,7 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, postadminSecret, mainadminSecr
 	auth := engine.Group("/api/v1/auth") // 认证相关路由分组(注册/登录/资料/改密)
 	auth.POST("/register", userhandler.Register(userService))
 	auth.POST("/login", userhandler.Login(userService))
-	auth.GET("/profile", middleware.Auth(jwtConfig), userhandler.GetProfile(userService))
+	auth.GET("/profile", middleware.Auth(jwtConfig), userhandler.GetProfile(userService, favoriteService))
 	auth.PATCH("/profile", middleware.Auth(jwtConfig), userhandler.UpdateProfile(userService))
 	auth.PATCH("/password", middleware.Auth(jwtConfig), userhandler.UpdatePassword(userService))
 	auth.DELETE("/account", middleware.Auth(jwtConfig), userhandler.DeactivateAccount(userService)) // 注销本人账号(软删除本人及本人内容)
@@ -72,6 +78,8 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, postadminSecret, mainadminSecr
 	post.PATCH("/:post_id/review", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.ReviewPost(postAdminService)) // 审核帖子：先登录校验，再要求管理员角色
 	post.POST("/:post_id/conversations", middleware.Auth(jwtConfig), conversationhandler.Start(conversationService))                                                      // 申领/召领：开启对话(按帖子 type 自动判定)
 	post.GET("/:post_id/comments", commenthandler.List(commentService))                                                                                                   // 评论列表仍挂在帖子下(读操作，语义上属于某帖的评论)
+	post.POST("/:post_id/favorite", middleware.Auth(jwtConfig), favoritehandler.Add(favoriteService))                                                                     // 收藏帖子
+	post.DELETE("/:post_id/favorite", middleware.Auth(jwtConfig), favoritehandler.Remove(favoriteService))                                                                // 取消收藏帖子
 
 	comment := engine.Group("/api/v1/comments")                                                       // 评论相关路由分组
 	comment.POST("", middleware.Auth(jwtConfig), commenthandler.Create(commentService))               // 发表评论已迁到评论分组(写操作归属评论模块)
@@ -87,6 +95,9 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, postadminSecret, mainadminSecr
 	announcementGroup := engine.Group("/api/v1/announcements") // 公告相关路由分组(公开)
 	announcementGroup.GET("", announcementhandler.List(announcementService))
 
+	feedbackGroup := engine.Group("/api/v1/feedbacks")                                                 // 反馈相关路由分组
+	feedbackGroup.POST("", middleware.Auth(jwtConfig), feedbackhandler.Submit(feedbackService)) // 提交反馈(需登录)
+
 	conversationGroup := engine.Group("/api/v1/conversations")                                                                                                     // 对话相关路由分组(均需登录)
 	conversationGroup.GET("", middleware.Auth(jwtConfig), conversationhandler.List(conversationService))                                                           // 我的对话列表
 	conversationGroup.GET("/:conversation_id", middleware.Auth(jwtConfig), conversationhandler.Get(conversationService))                                           // 会话详情(含所属帖子快照)
@@ -99,6 +110,7 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, postadminSecret, mainadminSecr
 
 	admin := engine.Group("/api/v1/admin") // 管理员路由分组(叠加角色校验)
 	admin.PATCH("/posts/:post_id/status", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.UpdatePostStatus(postAdminService))
+	admin.PATCH("/posts/:post_id/finished", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.UpdatePostFinished(postAdminService))
 	admin.GET("/posts/deleted", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.ListDeletedPosts(postAdminService))
 	admin.POST("/announcements", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.CreateAnnouncement(announcementService))
 	admin.DELETE("/announcements/:announcement_id", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.DeleteAnnouncement(announcementService))
@@ -107,6 +119,8 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, postadminSecret, mainadminSecr
 	admin.PATCH("/appeals/:appeal_id/review", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.ReviewAppeal(mainAdminService))
 	admin.GET("/reviews", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.ListReviews(mainAdminService))
 	admin.GET("/count", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.GetCountHandler(mainAdminService))
+	admin.GET("/feedbacks", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), feedbackhandler.List(feedbackService))
+	admin.PATCH("/feedbacks/:feedback_id/review", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), feedbackhandler.Review(feedbackService))
 
 	// postadmin := admin.Group("/postadmin")
 
