@@ -6,9 +6,9 @@ package service
 
 import "LAF/internal/model"
 
-// PageItem 约束可分页列表的元素类型：目前为帖子/评论/对话/消息四类资源(均为指针)。
+// PageItem 约束可分页列表的元素类型：目前为帖子/评论/对话/消息/公告五类资源(均为指针)。
 type PageItem interface {
-	*model.Post | *model.Comment | *model.Conversation | *model.Message
+	*model.Post | *model.Comment | *model.Conversation | *model.Message | *model.Announcement
 }
 
 // PageResult 是通用的分页返回结构，T 为列表元素类型(受 PageItem 约束)。

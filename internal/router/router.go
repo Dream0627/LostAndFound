@@ -14,6 +14,7 @@ import (
 	posthandler "LAF/internal/handler/post"
 	userhandler "LAF/internal/handler/user"
 
+	announcementhandler "LAF/internal/handler/announcement"
 	appealhandler "LAF/internal/handler/appeal"
 	conversationhandler "LAF/internal/handler/conversation"
 	geohandler "LAF/internal/handler/geo"
@@ -27,8 +28,8 @@ import (
 // New 构建并返回配置好的 gin.Engine。参数：数据库句柄、JWT 配置、两类管理员暗号。
 func New(db *gorm.DB, jwtConfig config.JWTConfig, postadminSecret, mainadminSecret string) *gin.Engine {
 	engine := gin.Default()
-	engine.Use(middleware.ErrorHandler()) // 注册全局错误处理中间件，统一兜底错误响应
-	engine.Static("/uploads", "./uploads")        // 把本地上传目录映射成静态资源，使图片可通过 /uploads/... 直接访问
+	engine.Use(middleware.ErrorHandler())  // 注册全局错误处理中间件，统一兜底错误响应
+	engine.Static("/uploads", "./uploads") // 把本地上传目录映射成静态资源，使图片可通过 /uploads/... 直接访问
 
 	userRepository := repository.NewUserRepository(db)                                                 // 装配阶段：先建仓库
 	userService := service.NewUserService(userRepository, jwtConfig, postadminSecret, mainadminSecret) // 再建服务，注入仓库与暗号
@@ -40,11 +41,15 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, postadminSecret, mainadminSecr
 	commentService := service.NewCommentService(commentRepository, postRepository)
 	appealRepository := repository.NewAppealRepository(db)
 	appealService := service.NewAppealService(appealRepository, userRepository)
-	mainAdminService := service.NewMainAdminService(userRepository, postRepository, appealRepository)
-	conversationRepository := repository.NewConversationRepository(db) // 对话模块：仓库
+	countRepository := repository.NewCountRepository(db)
+	mainAdminService := service.NewMainAdminService(userRepository, postRepository, appealRepository, countRepository) // 注入仓库：用户、帖子、申诉、计数
+	conversationRepository := repository.NewConversationRepository(db)                                                 // 对话模块：仓库
 	messageRepository := repository.NewMessageRepository(db)
 	finishRequestRepository := repository.NewFinishRequestRepository(db)
 	conversationService := service.NewConversationService(conversationRepository, messageRepository, finishRequestRepository, postRepository) // 对话/完成寻找服务(复用 postRepository)
+	announcementRepository := repository.NewAnnouncementRepository(db)
+	announcementService := service.NewAnnouncementService(announcementRepository)
+
 	//postAdminRepository := repository.NewPostAdminRepository(db)
 	//postAdminService := service.NewPostAdminService(postAdminRepository)
 	//mainAdminRepository := repository.NewMainAdminRepository(db)
@@ -79,6 +84,9 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, postadminSecret, mainadminSecr
 	geoGroup.GET("/locations", geohandler.ListLocations(geoService)) // 校园预设地点列表
 	geoGroup.POST("/locate", geohandler.Locate(geoService))          // 定位/匹配最近地点
 
+	announcementGroup := engine.Group("/api/v1/announcements") // 公告相关路由分组(公开)
+	announcementGroup.GET("", announcementhandler.List(announcementService))
+
 	conversationGroup := engine.Group("/api/v1/conversations")                                                                                                     // 对话相关路由分组(均需登录)
 	conversationGroup.GET("", middleware.Auth(jwtConfig), conversationhandler.List(conversationService))                                                           // 我的对话列表
 	conversationGroup.GET("/:conversation_id", middleware.Auth(jwtConfig), conversationhandler.Get(conversationService))                                           // 会话详情(含所属帖子快照)
@@ -92,10 +100,13 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, postadminSecret, mainadminSecr
 	admin := engine.Group("/api/v1/admin") // 管理员路由分组(叠加角色校验)
 	admin.PATCH("/posts/:post_id/status", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.UpdatePostStatus(postAdminService))
 	admin.GET("/posts/deleted", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.ListDeletedPosts(postAdminService))
+	admin.POST("/announcements", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.CreateAnnouncement(announcementService))
+	admin.DELETE("/announcements/:announcement_id", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"postadmin", "mainadmin"}), postadminhandler.DeleteAnnouncement(announcementService))
 	admin.DELETE("/users/:user_id", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.DeleteUser(mainAdminService))
 	admin.PATCH("/users/:user_id/recover", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.RecoverUser(mainAdminService))
 	admin.PATCH("/appeals/:appeal_id/review", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.ReviewAppeal(mainAdminService))
 	admin.GET("/reviews", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.ListReviews(mainAdminService))
+	admin.GET("/count", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.GetCountHandler(mainAdminService))
 
 	// postadmin := admin.Group("/postadmin")
 
