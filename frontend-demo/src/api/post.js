@@ -2,8 +2,8 @@
 import http from "./http";
 
 // 帖子列表（公开，带 token 可识别管理员身份）。
-// params: { type?: string[], status?: string[], finished?: 'true'|'false', page, page_size }
-// 返回 { list, total, page, page_size }；后端已将“未完成”排在前面。
+// params: { type?: string[], status?: string[], finished?: 'true'|'false', keyword?: string, page, page_size }
+// keyword 按标题模糊搜索物品名称（不必完全精确）；返回 { list, total, page, page_size }；后端已将“未完成”排在前面。
 export function listPosts(params = {}) {
   return http.get("/posts", { params });
 }

@@ -43,7 +43,13 @@
         </li>
       </ul>
 
-      <Pagination :page="page" :page-size="pageSize" :total="total" @change="onPageChange" />
+      <Pagination
+        :page="page"
+        :page-size="pageSize"
+        :total="total"
+        @change="onPageChange"
+        @change-page-size="onPageSizeChange"
+      />
     </template>
   </div>
 </template>
@@ -84,6 +90,12 @@ async function fetchList() {
 
 function onPageChange(p) {
   page.value = p;
+  fetchList();
+}
+
+function onPageSizeChange(size) {
+  pageSize.value = size;
+  page.value = 1;
   fetchList();
 }
 

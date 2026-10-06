@@ -66,6 +66,16 @@
       </div>
     </div>
 
+    <div class="card">
+      <h3>我的收藏（{{ favorites.length }}）</h3>
+      <EmptyState v-if="favorites.length === 0" text="还没有收藏任何帖子" icon="⭐">
+        <router-link to="/posts" class="btn">去广场逛逛</router-link>
+      </EmptyState>
+      <div v-else class="grid grid-posts">
+        <PostCard v-for="p in favorites" :key="p.id" :post="p" />
+      </div>
+    </div>
+
     <div class="card danger-zone">
       <h3>危险操作</h3>
       <p class="muted text-sm">注销后本人账号及名下帖子/评论将被软删除，可通过申诉恢复。</p>
@@ -89,6 +99,7 @@ const router = useRouter();
 
 const profile = ref(null);
 const myPosts = ref([]);
+const favorites = ref([]);
 const loading = ref(true);
 
 const editing = ref(false);
@@ -109,6 +120,7 @@ async function loadProfile() {
     const data = await getProfile();
     profile.value = data;
     myPosts.value = data.posts || [];
+    favorites.value = data.favorites || [];
     profileForm.name = data.user?.name || "";
     profileForm.username = data.user?.username || "";
     auth.setUser(data.user);

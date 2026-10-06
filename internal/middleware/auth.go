@@ -8,7 +8,6 @@ package middleware
 
 import (
 	"errors"
-	//"fmt"
 	"strings"
 
 	"github.com/gin-gonic/gin"

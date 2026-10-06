@@ -38,3 +38,29 @@ export function reviewAppeal(appealId, status) {
 export function listReviews(params = {}) {
   return http.get("/admin/reviews", { params });
 }
+
+// 后台数据概览（仅 mainadmin）：
+// { user_count, post_count, pending_post_count, pending_appeal_count, today_post_count, today_comment_count }
+export function getCount() {
+  return http.get("/admin/count");
+}
+
+// 公告发布（postadmin/mainadmin）：{ title(1~200), content(1~2000) }
+export function createAnnouncement(data) {
+  return http.post("/admin/announcements", data);
+}
+
+// 公告删除（postadmin/mainadmin，软删除）
+export function deleteAnnouncement(announcementId) {
+  return http.delete(`/admin/announcements/${announcementId}`);
+}
+
+// 反馈列表（仅 mainadmin，分页）：params: { status?: 'pending'|'approved'|'rejected', page, page_size }
+export function listFeedbacks(params = {}) {
+  return http.get("/admin/feedbacks", { params });
+}
+
+// 反馈审批（仅 mainadmin）：status = approved|rejected（只有 pending 可被审批）
+export function reviewFeedback(feedbackId, status) {
+  return http.patch(`/admin/feedbacks/${feedbackId}/review`, { status });
+}

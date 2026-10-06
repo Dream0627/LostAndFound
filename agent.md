@@ -61,16 +61,16 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 
 - 用户：`handler/user/{register,login,profile,update_profile,update_password,deactivate}.go` + `service/user.go` + `repository/user.go`
 - 帖子：`handler/post/{create,list,detail,delete,recover_post}.go` + `service/post.go` + `repository/post.go`
-- 帖子管理：`handler/postadmin/{review_post,update_status,list_deleted}.go` + `service/postadmin.go` + `repository/postadmin.go`
+- 帖子管理：`handler/postadmin/{review_post,update_status,update_finished,list_deleted,announcement_create,announcement_delete}.go` + `service/postadmin.go` + `repository/post.go`
 - 公告：`handler/announcement/list.go`（公开列表）+ `handler/postadmin/{announcement_create,announcement_delete}.go`（管理员发布/删除）+ `service/announcement.go` + `repository/announcement.go`
 - 评论：`handler/comment/{create,list,delete}.go` + `service/comment.go` + `repository/comment.go`
 - 申诉：`handler/appeal/create.go` + `service/appeal.go` + `repository/appeal.go`
-- 反馈：`handler/feedback/{submit,list,review}.go` + `service/feedback.go` + `repository/feedback.go`
+- 反馈：`handler/feedback/submit.go`（登录用户提交）+ `handler/mainadmin/{list_feedbacks,review_feedback}.go`（超管列表/审批）+ `service/feedback.go` + `repository/feedback.go`
 - 收藏：`handler/favorite/{add,remove}.go` + `service/favorite.go` + `repository/favorite.go`
 - 对话/完成寻找：`handler/conversation/{start,list,messages,send,finish,get_pending_finish,review_finish,withdraw_finish}.go` + `service/conversation.go` + `repository/{conversation,message,finish_request}.go`
 - 定位：`handler/geo/{locations,locate}.go` + `service/geo.go` + `pkg/geo/`
-- 超级管理员：`handler/mainadmin/{delete_user,recover_user,review_appeal,list_reviews,count}.go` + `service/mainadmin.go` + `repository/count.go`
-- 作者姓名回填：`repository/authorname.go`（跨 Post/Comment/Announcement 复用）
+- 超级管理员：`handler/mainadmin/{delete_user,recover_user,review_appeal,list_reviews,count,list_feedbacks,review_feedback}.go` + `service/mainadmin.go` + `repository/count.go`
+- 作者姓名回填：`repository/authorname.go`（跨 Post/Comment/Announcement/Feedback 复用）
 - 分页结果结构：`service/pageresult.go`（泛型 `PageResult[T]`）
 - 路由：`internal/router/router.go`
 
@@ -158,8 +158,8 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 | PATCH | `/appeals/:appeal_id/review` | mainadmin | `mainadmin.ReviewAppeal` |
 | GET | `/reviews` | mainadmin | `mainadmin.ListReviews`（`?type=post|appeal` 过滤） |
 | GET | `/count` | mainadmin | `mainadmin.GetCountHandler`（后台概览计数） |
-| GET | `/feedbacks` | mainadmin | `feedback.List`（`?status=pending|approved|rejected` 过滤，回填提交人 `author_name`） |
-| PATCH | `/feedbacks/:feedback_id/review` | mainadmin | `feedback.Review`（审批：`approved`/`rejected`，仅 pending 可审） |
+| GET | `/feedbacks` | mainadmin | `mainadmin.ListFeedbacks`（`?status=pending|approved|rejected` 过滤，回填提交人 `author_name`） |
+| PATCH | `/feedbacks/:feedback_id/review` | mainadmin | `mainadmin.ReviewFeedback`（审批：`approved`/`rejected`，仅 pending 可审） |
 
 **约定**
 - 列表接口统一走 `pkg/pagination`：`page`（默认 1）+ `page_size`（默认 20，上限 100），**不对外暴露 limit/offset**；返回信封 `{ list, total, page, page_size }`（见 `service.PageResult[T]`）。
@@ -287,7 +287,9 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 - 技术栈：Vue3 + Vue Router + Pinia + axios + Vite；`axios` baseURL 取 `VITE_API_BASE_URL`（默认 `/api/v1`）。
 - 统一响应拦截在 `src/api/http.js`：`code===0` 取 `data`，否则抛错；请求拦截自动注入 `Authorization: Bearer <token>`。
 - 图片地址归一：`src/utils/image.js` 的 `resolveImageUrl`。
-- 视图：`views/` 下含帖子列表/详情/发布、登录/注册、个人资料、申诉、对话/聊天、404，以及 `views/admin/`（Reviews/Appeals/Users/DeletedPosts）。
+- 视图：`views/` 下含帖子列表/详情/发布、登录/注册、个人资料（含收藏夹）、意见反馈、公告列表、申诉、对话/聊天、404，以及 `views/admin/`（AdminLayout + Reviews/PostsManage/AnnouncementsManage/DeletedPosts/Overview/Feedbacks/Appeals/Users）。
+- 通用分页组件 `components/Pagination.vue`：页码按钮组（省略号折叠）+ 每页数量下拉 + 跳页，受控组件；`change(page)` 切页、`changePageSize(size)` 改每页数量。所有列表页均需同时监听两个事件。
+- 管理员帖子状态集中在 `views/admin/PostsManageView.vue`：关键词搜索 + 审核/完成状态筛选，列表中直接执行通过/驳回/下架/重新通过/标记完成/取消完成。
 - 构建：`npm install && npm run build`；容器内由 Caddy 托管（`frontend-demo/Caddyfile` 做 SPA 回退 + `/api`、`/uploads` 同源反代到 `backend:8080`）。
 
 ---

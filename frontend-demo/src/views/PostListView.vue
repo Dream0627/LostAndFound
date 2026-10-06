@@ -13,6 +13,16 @@
     </div>
 
     <div class="card filters">
+      <div class="search-bar">
+        <input
+          v-model.trim="keyword"
+          class="input"
+          placeholder="搜索物品名称（支持模糊匹配）…"
+          @keydown.enter="applySearch"
+        />
+        <button class="btn btn-sm" @click="applySearch">搜索</button>
+        <button v-if="keyword" class="btn btn-ghost btn-sm" @click="clearSearch">清空</button>
+      </div>
       <div class="filter-group">
         <span class="filter-label">类型</span>
         <label class="chip" :class="{ active: filters.type.length === 0 }">
@@ -52,7 +62,13 @@
         <PostCard v-for="post in posts" :key="post.id" :post="post" :show-status="auth.isPostAdmin" />
       </div>
 
-      <Pagination :page="page" :page-size="pageSize" :total="total" @change="onPageChange" />
+      <Pagination
+        :page="page"
+        :page-size="pageSize"
+        :total="total"
+        @change="onPageChange"
+        @change-page-size="onPageSizeChange"
+      />
     </template>
   </div>
 </template>
@@ -72,6 +88,7 @@ const total = ref(0);
 const page = ref(1);
 const pageSize = ref(12);
 const loading = ref(false);
+const keyword = ref("");
 
 const filters = reactive({
   type: ["lost", "found"], // 默认全选，等价于不筛选（发送时若为全集则不传）
@@ -117,12 +134,24 @@ function toggleStatus(s) {
   fetchList();
 }
 
+function applySearch() {
+  page.value = 1;
+  fetchList();
+}
+
+function clearSearch() {
+  keyword.value = "";
+  page.value = 1;
+  fetchList();
+}
+
 function buildParams() {
   const params = { page: page.value, page_size: pageSize.value };
   // 仅当类型不是“全集”时才传，避免无意义的筛选。
   if (filters.type.length === 1) params.type = [filters.type[0]];
   if (filters.finished) params.finished = filters.finished;
   if (auth.isPostAdmin && filters.status.length > 0) params.status = [...filters.status];
+  if (keyword.value) params.keyword = keyword.value;
   return params;
 }
 
@@ -146,6 +175,12 @@ function onPageChange(p) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+function onPageSizeChange(size) {
+  pageSize.value = size;
+  page.value = 1;
+  fetchList();
+}
+
 onMounted(fetchList);
 
 // 登录/登出后角色变化（管理员筛选），刷新列表。
@@ -167,6 +202,13 @@ watch(() => auth.user?.role, () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+.search-bar {
+  display: flex;
+  gap: 8px;
+}
+.search-bar .input {
+  flex: 1;
 }
 .filter-group {
   display: flex;

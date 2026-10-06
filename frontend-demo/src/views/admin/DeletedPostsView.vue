@@ -27,7 +27,13 @@
         </ul>
       </div>
 
-      <Pagination :page="page" :page-size="pageSize" :total="total" @change="onPageChange" />
+      <Pagination
+        :page="page"
+        :page-size="pageSize"
+        :total="total"
+        @change="onPageChange"
+        @change-page-size="onPageSizeChange"
+      />
     </template>
   </div>
 </template>
@@ -80,6 +86,12 @@ async function handleRecover(postId) {
 
 function onPageChange(p) {
   page.value = p;
+  fetchList();
+}
+
+function onPageSizeChange(size) {
+  pageSize.value = size;
+  page.value = 1;
   fetchList();
 }
 

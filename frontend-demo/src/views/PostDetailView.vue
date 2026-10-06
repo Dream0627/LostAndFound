@@ -19,6 +19,10 @@
           <StatusBadge v-if="auth.isPostAdmin || isOwner" kind="status" :value="post.status" />
         </div>
         <div class="row">
+          <!-- 收藏（登录用户，非作者本人） -->
+          <button v-if="auth.isLoggedIn && !isOwner" class="btn btn-ghost btn-sm" :disabled="favBusy" @click="handleToggleFavorite">
+            {{ favorited ? "★ 已收藏" : "☆ 收藏" }}
+          </button>
           <!-- 待审核：走审核接口 -->
           <button v-if="canReview" class="btn btn-ghost btn-sm" @click="handleReview('approved')">通过</button>
           <button v-if="canReview" class="btn btn-ghost btn-sm" @click="handleReview('rejected')">驳回</button>
@@ -97,7 +101,13 @@
         </li>
       </ul>
 
-      <Pagination :page="cPage" :page-size="cPageSize" :total="cTotal" @change="onCommentPageChange" />
+      <Pagination
+        :page="cPage"
+        :page-size="cPageSize"
+        :total="cTotal"
+        @change="onCommentPageChange"
+        @change-page-size="onCommentPageSizeChange"
+      />
     </div>
   </div>
 </template>
@@ -114,6 +124,8 @@ import {
 } from "@/api/post";
 import { createComment, deleteComment } from "@/api/comment";
 import { updatePostStatus, updatePostFinished } from "@/api/admin";
+import { addFavorite, removeFavorite } from "@/api/favorite";
+import { getProfile } from "@/api/auth";
 import { useAuthStore } from "@/stores/auth";
 import { useToastStore } from "@/stores/toast";
 import StatusBadge from "@/components/StatusBadge.vue";
@@ -130,6 +142,8 @@ const postId = route.params.id;
 const post = ref(null);
 const loading = ref(true);
 const starting = ref(false);
+const favorited = ref(false);
+const favBusy = ref(false);
 
 const comments = ref([]);
 const cPage = ref(1);
@@ -235,6 +249,36 @@ async function handleToggleFinished(current) {
   }
 }
 
+async function fetchFavoriteState() {
+  if (!auth.isLoggedIn) return;
+  try {
+    const data = await getProfile();
+    const favs = data.favorites || [];
+    favorited.value = favs.some((f) => Number(f.id) === Number(postId));
+  } catch (e) {
+    favorited.value = false;
+  }
+}
+
+async function handleToggleFavorite() {
+  favBusy.value = true;
+  try {
+    if (favorited.value) {
+      await removeFavorite(postId);
+      favorited.value = false;
+      toast.success("已取消收藏");
+    } else {
+      await addFavorite(postId);
+      favorited.value = true;
+      toast.success("已收藏");
+    }
+  } catch (e) {
+    toast.error(e?.msg || "操作失败");
+  } finally {
+    favBusy.value = false;
+  }
+}
+
 async function handleDelete() {
   if (!window.confirm("确定删除该帖子？删除后其评论也会一并删除。")) return;
   try {
@@ -291,9 +335,16 @@ function onCommentPageChange(p) {
   fetchComments();
 }
 
+function onCommentPageSizeChange(size) {
+  cPageSize.value = size;
+  cPage.value = 1;
+  fetchComments();
+}
+
 onMounted(() => {
   fetchPost();
   fetchComments();
+  fetchFavoriteState();
 });
 </script>
 

@@ -8,7 +8,11 @@
       <h3 class="admin-side-title">管理后台</h3>
       <nav class="admin-nav">
         <router-link to="/admin/reviews" class="admin-link">待审批</router-link>
+        <router-link to="/admin/posts" class="admin-link">帖子管理</router-link>
+        <router-link to="/admin/announcements" class="admin-link">公告管理</router-link>
         <router-link to="/admin/deleted-posts" class="admin-link">已删帖子</router-link>
+        <router-link v-if="auth.isMainAdmin" to="/admin/overview" class="admin-link">数据概览</router-link>
+        <router-link v-if="auth.isMainAdmin" to="/admin/feedbacks" class="admin-link">反馈审批</router-link>
         <router-link v-if="auth.isMainAdmin" to="/admin/appeals" class="admin-link">申诉审核</router-link>
         <router-link v-if="auth.isMainAdmin" to="/admin/users" class="admin-link">用户管理</router-link>
       </nav>

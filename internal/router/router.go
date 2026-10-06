@@ -56,11 +56,6 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, postadminSecret, mainadminSecr
 	favoriteRepository := repository.NewFavoriteRepository(db)
 	favoriteService := service.NewFavoriteService(favoriteRepository, postRepository)
 
-	//postAdminRepository := repository.NewPostAdminRepository(db)
-	//postAdminService := service.NewPostAdminService(postAdminRepository)
-	//mainAdminRepository := repository.NewMainAdminRepository(db)
-	//mainAdminService := service.NewMainAdminService(mainAdminRepository)
-
 	auth := engine.Group("/api/v1/auth") // 认证相关路由分组(注册/登录/资料/改密)
 	auth.POST("/register", userhandler.Register(userService))
 	auth.POST("/login", userhandler.Login(userService))
@@ -119,12 +114,8 @@ func New(db *gorm.DB, jwtConfig config.JWTConfig, postadminSecret, mainadminSecr
 	admin.PATCH("/appeals/:appeal_id/review", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.ReviewAppeal(mainAdminService))
 	admin.GET("/reviews", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.ListReviews(mainAdminService))
 	admin.GET("/count", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.GetCountHandler(mainAdminService))
-	admin.GET("/feedbacks", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), feedbackhandler.List(feedbackService))
-	admin.PATCH("/feedbacks/:feedback_id/review", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), feedbackhandler.Review(feedbackService))
-
-	// postadmin := admin.Group("/postadmin")
-
-	// mainadmin := admin.Group("/mainadmin")
+	admin.GET("/feedbacks", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.ListFeedbacks(feedbackService))
+	admin.PATCH("/feedbacks/:feedback_id/review", middleware.Auth(jwtConfig), middleware.RequireRole([]string{"mainadmin"}), mainadminhandler.ReviewFeedback(feedbackService))
 
 	return engine
 }

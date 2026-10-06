@@ -14,10 +14,12 @@
 
       <nav class="nav-links">
         <router-link to="/posts" class="nav-link">广场</router-link>
+        <router-link to="/announcements" class="nav-link">公告</router-link>
 
         <template v-if="auth.isLoggedIn">
           <router-link to="/posts/new" class="nav-link">发布</router-link>
           <router-link to="/conversations" class="nav-link">消息</router-link>
+          <router-link to="/feedback" class="nav-link">反馈</router-link>
           <router-link v-if="auth.isPostAdmin" to="/admin" class="nav-link">管理后台</router-link>
         </template>
       </nav>

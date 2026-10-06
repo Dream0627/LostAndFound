@@ -56,6 +56,7 @@
           :page-size="pageSize"
           :total="total"
           @change="onPageChange"
+          @change-page-size="onPageSizeChange"
         />
       </div>
 
@@ -174,6 +175,12 @@ function setType(t) {
 
 function onPageChange(p) {
   page.value = p;
+  fetchReviews();
+}
+
+function onPageSizeChange(size) {
+  pageSize.value = size;
+  page.value = 1;
   fetchReviews();
 }
 

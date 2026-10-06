@@ -24,6 +24,12 @@ const routes = [
     meta: { title: "账号申诉" },
   },
   {
+    path: "/announcements",
+    name: "announcements",
+    component: () => import("@/views/AnnouncementListView.vue"),
+    meta: { title: "公告" },
+  },
+  {
     path: "/posts",
     name: "post-list",
     component: () => import("@/views/PostListView.vue"),
@@ -48,6 +54,12 @@ const routes = [
     meta: { requiresAuth: true, title: "我的" },
   },
   {
+    path: "/feedback",
+    name: "feedback",
+    component: () => import("@/views/FeedbackView.vue"),
+    meta: { requiresAuth: true, title: "意见反馈" },
+  },
+  {
     path: "/conversations",
     name: "conversation-list",
     component: () => import("@/views/ConversationListView.vue"),
@@ -66,16 +78,40 @@ const routes = [
     children: [
       { path: "", redirect: "/admin/reviews" },
       {
+        path: "overview",
+        name: "admin-overview",
+        component: () => import("@/views/admin/OverviewView.vue"),
+        meta: { roles: ["mainadmin"], title: "数据概览" },
+      },
+      {
         path: "reviews",
         name: "admin-reviews",
         component: () => import("@/views/admin/ReviewsView.vue"),
         meta: { title: "待审批" },
       },
       {
+        path: "posts",
+        name: "admin-posts",
+        component: () => import("@/views/admin/PostsManageView.vue"),
+        meta: { title: "帖子管理" },
+      },
+      {
+        path: "announcements",
+        name: "admin-announcements",
+        component: () => import("@/views/admin/AnnouncementsManageView.vue"),
+        meta: { title: "公告管理" },
+      },
+      {
         path: "deleted-posts",
         name: "admin-deleted-posts",
         component: () => import("@/views/admin/DeletedPostsView.vue"),
         meta: { title: "已删帖子" },
+      },
+      {
+        path: "feedbacks",
+        name: "admin-feedbacks",
+        component: () => import("@/views/admin/FeedbacksView.vue"),
+        meta: { roles: ["mainadmin"], title: "反馈审批" },
       },
       {
         path: "appeals",
