@@ -39,6 +39,7 @@ func (r *PostRepository) GetPostByID(postID uint64) (*model.Post, error) {
 		return nil, apperror.DatabaseError
 	}
 	r.fillPostAuthorNames([]*model.Post{&post}) // 回填作者姓名(展示用，非表字段)
+	r.fillCategoryNames([]*model.Post{&post})   // 回填分类名称(展示用，非表字段)
 	return &post, nil
 }
 
@@ -55,6 +56,7 @@ func (r *PostRepository) GetPostByIDUnscoped(postID uint64) (*model.Post, error)
 		return nil, apperror.DatabaseError
 	}
 	r.fillPostAuthorNames([]*model.Post{&post}) // 回填作者姓名(展示用，非表字段)
+	r.fillCategoryNames([]*model.Post{&post})   // 回填分类名称(展示用，非表字段)
 	return &post, nil
 }
 
@@ -120,12 +122,15 @@ func (r *PostRepository) RecoverPost(postID uint64) error {
 // 过滤条件用“仅当有值时才拼接”的方式，实现对空过滤条件的忽略；finished 为 nil 表示不限。
 // 同样用闭包复用基础查询，先 Count 求总数，再 Limit/Offset 取当页数据；
 // 排序为“未完成优先(is_finished 升序)，同组内新帖在前(id 倒序)”，使已完成帖子沉到列表末尾。
-func (r *PostRepository) GetPosts(types []string, statuses []string, finished *bool, limit, offset int) ([]*model.Post, int64, error) {
+func (r *PostRepository) GetPosts(categoryID uint64, types []string, statuses []string, finished *bool, limit, offset int) ([]*model.Post, int64, error) {
 	var posts []*model.Post
 	var total int64
 
 	buildQuery := func() *gorm.DB {
 		query := r.db.Model(&model.Post{})
+		if categoryID > 0 {
+			query = query.Where("category_id = ?", categoryID)
+		}
 		if len(types) > 0 {
 			query = query.Where("type IN ?", types)
 		}
@@ -145,6 +150,7 @@ func (r *PostRepository) GetPosts(types []string, statuses []string, finished *b
 		return nil, 0, apperror.DatabaseError
 	}
 	r.fillPostAuthorNames(posts) // 回填作者姓名(展示用，非表字段)
+	r.fillCategoryNames(posts)   // 回填分类名称(展示用，非表字段)
 	return posts, total, nil
 }
 
@@ -165,6 +171,7 @@ func (r *PostRepository) GetDeletedPosts(limit, offset int) ([]*model.Post, int6
 		return nil, 0, apperror.DatabaseError
 	}
 	r.fillPostAuthorNames(posts) // 回填作者姓名(展示用，非表字段)
+	r.fillCategoryNames(posts)   // 回填分类名称(展示用，非表字段)
 	return posts, total, nil
 }
 

@@ -70,4 +70,7 @@ var (
 	InvalidFinishRequestStatusError = NewError(400, "无效的完成申请状态")
 	FinishRequestNotPendingError    = NewError(400, "该完成申请不可处理")
 	AdminSecretError                = NewError(403, "管理员暗号错误")
+	FeedbackNotFoundError           = NewError(404, "反馈不存在")
+	InvalidFeedbackStatusError      = NewError(400, "无效的反馈状态")
+	FeedbackAlreadyProcessedError   = NewError(409, "该反馈已经处理完成")
 )

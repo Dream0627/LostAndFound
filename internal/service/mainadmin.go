@@ -130,7 +130,7 @@ func (s *MainAdminService) GetPendingReviews(reviewType string, page, pageSize i
 	}
 
 	if includePosts {
-		posts, _, err := s.postRepository.GetPosts(nil, []string{model.PostStatusPending}, nil, pageSize, offset) // finished=nil: 待审核列表不限完成状态
+		posts, _, err := s.postRepository.GetPosts(0, nil, []string{model.PostStatusPending}, nil, pageSize, offset) // finished=nil: 待审核列表不限完成状态
 		if err != nil {
 			return nil, err
 		}

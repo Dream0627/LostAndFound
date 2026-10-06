@@ -62,6 +62,8 @@ type Post struct {
 	Type         string  `gorm:"column:type;type:enum('lost','found');not null;default:'lost';comment:帖子类型" json:"type"`
 	Title        string  `gorm:"column:title;type:varchar(2000);not null" json:"title"`
 	ImageURL     *string `gorm:"column:image_url;type:varchar(1024);default:null;comment:图片URL" json:"image_url"` // 用指针类型表示“可为空”，NULL 与空字符串含义不同
+	CategoryID   uint64  `gorm:"column:category_id;index;comment:物品分类ID,允许NULL表示未选择分类" json:"category_id"`
+	CategoryName string  `gorm:"-" json:"category_name"` // 分类名称，非数据库字段，查询帖子后回填给前端展示
 	LocationID   string  `gorm:"column:location_id;type:varchar(64);not null;default:'';comment:校园预设地点ID(冗余快照)" json:"location_id"`
 	LocationName string  `gorm:"column:location_name;type:varchar(128);not null;default:'';comment:地点名称快照(冗余,减少前端查询)" json:"location_name"`
 	Supplement   string  `gorm:"column:supplement;type:varchar(200);not null;default:'';comment:地点补充说明" json:"supplement"`
@@ -148,4 +150,28 @@ type Announcement struct {
 	AuthorName string `gorm:"-" json:"author_name"` // 发布管理员姓名：非表字段，查询后按 admin_id 回填，仅用于返回给前端
 	Title      string `gorm:"column:title;type:varchar(200);not null;comment:公告标题" json:"title"`
 	Content    string `gorm:"column:content;type:varchar(2000);not null;comment:公告内容" json:"content"`
+}
+type Feedback struct {
+	gorm.Model
+	UserID  uint64 `gorm:"column:user_id;not null;comment:提交用户ID"`
+	Content string `gorm:"column:content;type:varchar(2000);not null;comment:反馈内容"`
+	Status  string `gorm:"column:status;type:varchar(20);not null;default:'pending';comment:状态 pending待处理 processed已处理 rejected已拒绝"`
+}
+
+// feedback status const
+const (
+	FeedbackStatusPending   = "pending"
+	FeedbackStatusProcessed = "processed"
+	FeedbackStatusRejected  = "rejected"
+)
+
+// Category 物品分类字典表
+// 意义：统一维护系统全部物品分类选项，作为主数据；前端发布帖子下拉框读取本表；
+// 管理员接口可以新增、禁用、调整排序；所有帖子通过 category_id 外键关联本表，避免字符串重复存储。
+type Category struct {
+	BaseModel
+	ID     uint64 `gorm:"column:id;primaryKey;autoIncrement;comment:分类ID" json:"id"`
+	Name   string `gorm:"column:name;type:varchar(64);not null;uniqueIndex;comment:分类名称，例：雨伞、充电宝、耳机"`
+	Sort   int    `gorm:"column:sort;default:0;comment:展示排序，数字越小越靠前"`
+	Enable bool   `gorm:"column:enable;default:true;comment:是否启用,false代表禁用不再供选择"`
 }

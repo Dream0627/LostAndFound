@@ -3,6 +3,8 @@
 package post
 
 import (
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 
 	"LAF/internal/middleware"
@@ -15,7 +17,7 @@ import (
 // ListPosts 是“帖子列表”的处理器工厂。
 func ListPosts(postService *service.PostService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		types := c.QueryArray("type") // 读取可重复的 type 查询参数(?type=lost&type=found)
+		types := c.QueryArray("type")      // 读取可重复的 type 查询参数(?type=lost&type=found)
 		statuses := c.QueryArray("status") // 读取可重复的 status 查询参数
 		page, pageSize := pagination.Parse(c.Query("page"), c.Query("page_size"))
 
@@ -25,10 +27,16 @@ func ListPosts(postService *service.PostService) gin.HandlerFunc {
 			apperror.AbortWithException(c, apperror.ParamError, err)
 			return
 		}
-
 		nowUserRole, _ := middleware.CurrentRole(c)
+		var categoryID uint64
+		ctrID := c.Query("category_id")
+		if ctrID != "" {
+			if id, err := strconv.ParseUint(ctrID, 10, 64); err == nil {
+				categoryID = uint64(id)
+			}
+		}
 
-		result, err := postService.GetPosts(types, statuses, finished, nowUserRole, page, pageSize) // 交由业务层做过滤与可见性控制
+		result, err := postService.GetPosts(categoryID, types, statuses, finished, nowUserRole, page, pageSize) // 交由业务层做过滤与可见性控制
 		if err != nil {
 			apperror.AbortWithError(c, err)
 			return
