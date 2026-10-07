@@ -122,7 +122,9 @@ function handleGeolocate() {
       locating.value = false;
       errorMsg.value = geoErrorMessage(err);
     },
-    { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+    // 必须开启高精度：否则室内会退化到基站/Wi-Fi 粗定位（误差可达数百米），
+    // 匹配到的楼栋会跨片区出错；maximumAge 置 0 避免复用走位前的缓存坐标。
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   );
 }
 
