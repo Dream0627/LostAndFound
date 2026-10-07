@@ -1,6 +1,21 @@
 # LAF 前端站点的 Caddy 配置：托管 SPA 静态资源，并同源反代后端接口与上传目录。
 # 同源反代可让浏览器不触发跨域(CORS)，也无需后端额外放开来源。
-:80 {
+#
+# HTTPS 说明（自签名方案，无需域名）：
+#   - 站点地址取环境变量 SITE_ADDRESS（服务器公网 IP），tls internal 让 Caddy 用
+#     内置 CA 签发自签名证书；浏览器会提示"连接不安全"，点"继续访问"即可。
+#   - 点过警告后页面仍是 https 安全上下文，一键定位(navigator.geolocation)可用。
+#   - default_sni：裸 IP 访问时客户端不发 SNI，不配置会导致 TLS 握手失败
+#     （ERR_SSL_PROTOCOL_ERROR）。
+{
+	default_sni {$SITE_ADDRESS}
+	# 容器内无需把内置 CA 的根证书安装进系统信任库（装了也没用，访问端仍是不受信任）。
+	skip_install_trust
+}
+
+{$SITE_ADDRESS} {
+	tls internal
+
 	root * /usr/share/caddy
 	encode gzip
 

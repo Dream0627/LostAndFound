@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================================
 # LAF 前后端分离 · 一键部署脚本
-# 端口规划：8080=后端 API（直接对外），9090=临时前端 frontend-demo。
+# 端口规划：8080=后端 API（直接对外），443=临时前端 frontend-demo（HTTPS，自签名证书）。
 # 用法：把项目上传到服务器后，在项目根目录执行：  bash deploy.sh
 # 作用：内存/swap 自检 -> Docker 自检(可自动安装) ->
 #       生成 JWT secret -> 构建启动 -> 健康检查
@@ -12,7 +12,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 BACKEND_PORT="${BACKEND_PORT:-8080}"
-FRONTEND_PORT="${FRONTEND_PORT:-9090}"
+FRONTEND_PORT="${FRONTEND_PORT:-443}"
 COMPOSE_FILE="docker-compose.yml"
 CFG="config/config.docker.yaml"
 ASSUME_YES="${ASSUME_YES:-0}"
@@ -94,6 +94,19 @@ case "$PUBLIC_BASE_URL" in
   *127.0.0.1*|*localhost*) warn "当前对外地址是本地回环，若服务器未绑定公网IP，外部将无法访问。" ;;
 esac
 
+# 临时前端 HTTPS 站点地址：Caddy 用它签发自签名证书（见 frontend-demo/Caddyfile）。
+# 缺失或仍是模板占位符时，自动写入上面推断出的公网 IP。
+SITE_ADDRESS="${SITE_ADDRESS:-$(grep -E '^SITE_ADDRESS=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- || true)}"
+if [ -z "$SITE_ADDRESS" ] || [ "$SITE_ADDRESS" = "your.server.public.ip" ]; then
+  SITE_ADDRESS="$IP"
+  if grep -q '^SITE_ADDRESS=' "$ENV_FILE" 2>/dev/null; then
+    sed -i.bak -E "s#^SITE_ADDRESS=.*#SITE_ADDRESS=${SITE_ADDRESS}#" "$ENV_FILE"; rm -f "$ENV_FILE".bak
+  else
+    printf '\nSITE_ADDRESS=%s\n' "$SITE_ADDRESS" >> "$ENV_FILE"
+  fi
+  log "已在 $ENV_FILE 设置 SITE_ADDRESS=${SITE_ADDRESS}（临时前端 HTTPS 站点地址）"
+fi
+
 
 # ---- 3. 生成 JWT secret（仍为占位符时）-----------------------------------
 if grep -q "CHANGE_ME_WITH_RANDOM_SECRET" "$CFG"; then
@@ -119,12 +132,12 @@ for i in $(seq 1 60); do
 done
 [ "$OK" = "1" ] || err "后端未在预期时间内就绪，请查看： $DC logs -f backend"
 
-log "等待临时前端站点就绪..."
+log "等待临时前端站点就绪（HTTPS 自签名证书，curl 用 -k 跳过校验）..."
 OK=0
 for i in $(seq 1 30); do
-  code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "http://127.0.0.1:${FRONTEND_PORT}/" || true)"
+  code="$(curl -k -s -o /dev/null -w '%{http_code}' --max-time 3 "https://127.0.0.1:${FRONTEND_PORT}/" || true)"
   if [ "$code" = "200" ] || [ "$code" = "304" ]; then
-    log "临时前端已就绪：${PUBLIC_BASE_URL}:${FRONTEND_PORT}/  （HTTP ${code}）"; OK=1; break
+    log "临时前端已就绪：https://${SITE_ADDRESS}:${FRONTEND_PORT}/  （HTTP ${code}）"; OK=1; break
   fi
   sleep 2
 done
@@ -132,5 +145,6 @@ done
 
 log "容器状态："
 $DC -f "$COMPOSE_FILE" ps
-log "完成。后端 API: ${PUBLIC_BASE_URL}:${BACKEND_PORT}  临时前端: ${PUBLIC_BASE_URL}:${FRONTEND_PORT}"
+log "完成。后端 API: ${PUBLIC_BASE_URL}:${BACKEND_PORT}  临时前端: https://${SITE_ADDRESS}/"
+log "提醒：浏览器首次访问临时前端会提示『连接不安全』（自签名证书），点「继续访问」即可；一键定位依赖该 HTTPS。"
 log "提醒：正式前端若部署在另一台服务器，请在其 Caddy 反代 /api、/uploads 到 ${PUBLIC_BASE_URL}:${BACKEND_PORT}（后端无 CORS，前端不能直连后端）。"

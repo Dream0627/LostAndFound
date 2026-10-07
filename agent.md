@@ -296,7 +296,7 @@ frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）�
 
 ## 13. 部署（在线更新）
 
-**形态**：前后端分服务器部署。后端 `8080` 直接对外提供 API 与 `/uploads` 图片（**无 CORS**）；临时前端 `9090`（容器内 Caddy 同源反代后端）；正式前端由前端同学部署到前端服务器，Caddy 将 `/api`、`/uploads` 反代到后端。MySQL 仅容器内网可达。三服务编排见 `docker-compose.yml`（mysql + backend + frontend）。
+**形态**：前后端分服务器部署。后端 `8080` 直接对外提供 API 与 `/uploads` 图片（**无 CORS**）；临时前端 `443`（容器内 Caddy 用自签名证书提供 HTTPS，站点地址取 `.env` 的 `SITE_ADDRESS`，并同源反代后端）；正式前端由前端同学部署到前端服务器，Caddy 将 `/api`、`/uploads` 反代到后端。MySQL 仅容器内网可达。三服务编排见 `docker-compose.yml`（mysql + backend + frontend）。
 
 **相关文件**：`Dockerfile`（后端多阶段构建）、`frontend-demo/Dockerfile` + `Caddyfile`、`config/config.docker.yaml`、`docker-compose.yml`、`deploy.sh`（服务器一键部署）、`migrations/tables.sql`（首次启动自动建表）。
 

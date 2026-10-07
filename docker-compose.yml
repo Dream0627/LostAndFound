@@ -8,7 +8,9 @@
 # 停止：docker compose down        （加 -v 会连同数据卷一起删除）
 # 端口规划：
 #   8080 -> 后端 API（直接对外，供前端服务器 Caddy 反代访问；/uploads 图片也在此端口）
-#   9090 -> 临时前端 frontend-demo（容器内 Caddy 同源反代后端，之后由正式前端替换）
+#   443  -> 临时前端 frontend-demo 的 HTTPS 站点（自签名证书，需在 .env 设置 SITE_ADDRESS）
+#   9090 -> 容器内 80，仅用于把旧的 http 地址重定向到 https
+# 服务器需在安全组放行 443。
 services:
   mysql:
     image: mysql:8.0
@@ -68,9 +70,15 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-    # 临时前端站点映射到宿主机 9090（8080 已让给后端 API）；
-    # 容器内 Caddy 仍将 /api、/uploads 同源反代到 backend，跨域与端口无关。
+    environment:
+      # 服务器公网 IP：Caddy 用它签发自签名证书（见 frontend-demo/Caddyfile）。
+      # 在 .env 中设置，避免真实 IP 进入仓库。
+      SITE_ADDRESS: ${SITE_ADDRESS:?请在 .env 中设置 SITE_ADDRESS=<服务器公网IP>}
+    # 443 -> HTTPS 站点（自签名，浏览器提示"不安全"，点继续访问后一键定位可用）；
+    # 9090 -> 容器内 80，Caddy 会自动把 http 请求重定向到 https。
+    # 注意：阿里云安全组需放行 443。
     ports:
+      - "443:443"
       - "9090:80"
 
 volumes:
