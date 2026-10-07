@@ -44,7 +44,7 @@ pkg/
   apperror/                     # Error{Code,Msg} + 预定义错误码 + Abort/Handle 助手
   response/                     # {code,msg,data} 信封
   pagination/                   # page/page_size 解析（默认 20，上限 100）
-  geo/                          # 校园预设地点与坐标匹配（无外部依赖）
+  geo/                          # 校园预设地点(GCJ-02)与坐标匹配、WGS-84→GCJ-02 转换（无外部依赖）
 migrations/tables.sql           # 手写 DDL（DROP IF EXISTS + CREATE，CHECK/外键/索引）
 frontend-demo/                  # 前端示例（Vue3 + Vite + Pinia + axios）；详见第 12 节
 ```

@@ -41,7 +41,8 @@ func (s *GeoService) ListLocations() []LocationGroup {
 // LocateInput 是“定位/匹配”的入参 DTO。
 // 两种用法二选一：
 //  1) 手动选择：传 LocationID；
-//  2) 自动定位：传 Latitude/Longitude(并把 HasCoords 置真)，由后端匹配最近的预设地点。
+//  2) 自动定位：传 Latitude/Longitude(浏览器 WGS-84 坐标，并把 HasCoords 置真)，
+//     由后端转成 GCJ-02 后匹配最近的预设地点。
 // Supplement 是可选补充说明(手动选择后可再补充，如“图书馆东门台阶旁”)。
 type LocateInput struct {
 	LocationID string
@@ -85,7 +86,10 @@ func (s *GeoService) Locate(input LocateInput) (*LocateResult, error) {
 		if !geo.IsValidCoordinates(coords) {
 			return nil, apperror.InvalidCoordinateError
 		}
-		loc, dist, ok := geo.Nearest(coords)
+		// 浏览器 Geolocation 返回 WGS-84，而预设地点表是 GCJ-02(高德/腾讯坐标系)，
+		// 必须先转成同一坐标系再比较，否则会有数百米系统性偏差、跨片区选错楼。
+		matched := geo.WGSToGCJ02(coords)
+		loc, dist, ok := geo.Nearest(matched)
 		if !ok {
 			return nil, apperror.GeoLocationNotFoundError
 		}

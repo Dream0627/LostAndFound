@@ -72,6 +72,53 @@ func IsValidCoordinates(c Coordinates) bool {
 	return true
 }
 
+// 国内地图(高德/腾讯)使用 GCJ-02(火星坐标系)，而浏览器 Geolocation 按规范返回 WGS-84，
+// 杭州一带两者相差约 400~600 米——足以让“匹配最近地点”跨片区选错楼。
+// 下面用国测局公开的偏移算法把 WGS-84 转成 GCJ-02，只依赖标准库 math，不引入第三方依赖。
+const (
+	gcjAxis  = 6378245.0              // 克拉索夫斯基椭球长半轴(米)
+	gcjEccSq = 0.00669342162296594323 // 第一偏心率的平方
+)
+
+// outOfChina 判断坐标是否在中国大陆范围外；境外无 GCJ-02 偏移，应保持原坐标。
+func outOfChina(lat, lon float64) bool {
+	return lon < 72.004 || lon > 137.8347 || lat < 0.8293 || lat > 55.8271
+}
+
+// gcjOffsetLat / gcjOffsetLon 是偏移量的中间多项式(国测局公开算法)，x 为经度差、y 为纬度差。
+func gcjOffsetLat(x, y float64) float64 {
+	ret := -100 + 2*x + 3*y + 0.2*y*y + 0.1*x*y + 0.2*math.Sqrt(math.Abs(x))
+	ret += (20*math.Sin(6*x*math.Pi) + 20*math.Sin(2*x*math.Pi)) * 2 / 3
+	ret += (20*math.Sin(y*math.Pi) + 40*math.Sin(y/3*math.Pi)) * 2 / 3
+	ret += (160*math.Sin(y/12*math.Pi) + 320*math.Sin(y*math.Pi/30)) * 2 / 3
+	return ret
+}
+
+func gcjOffsetLon(x, y float64) float64 {
+	ret := 300 + x + 2*y + 0.1*x*x + 0.1*x*y + 0.1*math.Sqrt(math.Abs(x))
+	ret += (20*math.Sin(6*x*math.Pi) + 20*math.Sin(2*x*math.Pi)) * 2 / 3
+	ret += (20*math.Sin(x*math.Pi) + 40*math.Sin(x/3*math.Pi)) * 2 / 3
+	ret += (150*math.Sin(x/12*math.Pi) + 300*math.Sin(x/30*math.Pi)) * 2 / 3
+	return ret
+}
+
+// WGSToGCJ02 把 WGS-84 坐标转换成 GCJ-02。
+// 用途：浏览器定位返回的是 WGS-84，而校园预设地点表(见 campus.go)用的是 GCJ-02，
+// 匹配前必须先统一坐标系，否则会出现数百米的系统性偏差。
+func WGSToGCJ02(c Coordinates) Coordinates {
+	if (c.Latitude == 0 && c.Longitude == 0) || outOfChina(c.Latitude, c.Longitude) {
+		return c
+	}
+	dLat := gcjOffsetLat(c.Longitude-105, c.Latitude-35)
+	dLon := gcjOffsetLon(c.Longitude-105, c.Latitude-35)
+	radLat := c.Latitude / 180 * math.Pi
+	magic := 1 - gcjEccSq*math.Sin(radLat)*math.Sin(radLat)
+	sqrtMagic := math.Sqrt(magic)
+	dLat = dLat * 180 / ((gcjAxis * (1 - gcjEccSq)) / (magic * sqrtMagic) * math.Pi)
+	dLon = dLon * 180 / (gcjAxis / sqrtMagic * math.Cos(radLat) * math.Pi)
+	return Coordinates{Latitude: c.Latitude + dLat, Longitude: c.Longitude + dLon}
+}
+
 // FindByID 在全部校园预设地点中按 ID 查找；found 为 false 表示不存在。
 func FindByID(id string) (Location, bool) {
 	for _, loc := range CampusLocations() {
